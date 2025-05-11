@@ -8,6 +8,7 @@ from threading import Thread
 from datetime import datetime
 from apps.file_explorer import FileExplorer
 from apps.terminal import Terminal
+import playsound
 
 class WindowManager:
     def __init__(self, taskbar):
@@ -143,6 +144,7 @@ class Taskbar(tk.Tk):
         confirm = messagebox.askyesno("Exit", "Are you sure you want to exit FranchukOS?")
         if confirm:
             self.quit()
+            playsound.playsound("assets/sounds/shutdown.wav")  
 
     def add_taskbar_button(self, window_name):
         button = tk.Button(self.taskbar_buttons_frame, text=window_name, command=lambda: self.window_manager.switch_to_window(window_name))

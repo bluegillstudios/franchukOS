@@ -2,3 +2,4 @@ psutil
 pillow
 tkinterdnd2
 playsound
+PyQt5

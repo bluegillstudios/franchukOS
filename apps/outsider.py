@@ -8,7 +8,7 @@ from tkinter import filedialog, messagebox
 from PIL import Image, ImageTk, ExifTags
 
 
-class ImageViewer:
+class Outsider:
     def __init__(self):
         self.root = tk.Toplevel()
         self.root.title("Outsider v1.14")
@@ -145,4 +145,4 @@ class ImageViewer:
             self.load_image_group(file_path)
 
 def launch():
-    ImageViewer()
+    Outsider()

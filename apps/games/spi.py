@@ -25,7 +25,7 @@ window = turtle.Screen()
 window.tracer(0)
 window.setup(0.5, 0.75)
 window.bgcolor(0.2, 0.2, 0.2)
-window.title("Space Invaders v2.40")
+window.title("Space Invaders v2.55")
 
 LEFT = -window.window_width() / 2
 RIGHT = window.window_width() / 2

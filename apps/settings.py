@@ -47,7 +47,7 @@ class SettingsApp:
         info_frame.pack(padx=20, pady=10, fill="x")
 
         ttk.Label(info_frame, text=f"Version: {OS_VERSION}", font=("Segoe UI", 10)).pack(padx=10, pady=5)
-        ttk.Label(info_frame, text="© 2025 FranchukOS Project", font=("Segoe UI", 9)).pack(padx=10, pady=2)
+        ttk.Label(info_frame, text="© 2025 FranchukOS Project Authors", font=("Segoe UI", 9)).pack(padx=10, pady=2)
 
     def set_default_wallpaper(self):
         set_background_image(self.root, "assets/backgrounds/wallpaper.png")
