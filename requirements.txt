@@ -1,0 +1,4 @@
+psutil
+pillow
+tkinterdnd2
+playsound
