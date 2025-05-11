@@ -14,7 +14,7 @@ class SettingsApp:
     def __init__(self):
         self.config = load_config()
         self.root = tk.Toplevel()
-        self.root.title("FranchukOS Settings")
+        self.root.title("Settings")
         self.root.geometry("500x500")
         self.root.configure(bg="white")
         self.build_ui()
