@@ -98,7 +98,7 @@ class ClockApp:
     def timer_alert(self):
         """Alert the user when the timer reaches zero."""
         messagebox.showinfo("Timer", "Time's up!")
-        winsound.Beep(1000, 1000)  # Sound for Windows, you can change it for other platforms
+        winsound.Beep(1000, 1000)  
 
     def set_alarm(self):
         """Set an alarm based on user input."""

@@ -62,7 +62,7 @@ class Terminal(tk.Toplevel):
             "arch": self.show_architecture,
             "python": self.run_python_interpreter,
             "help": self.show_help,
-            "version": lambda args: "FranchukOS version 29.0.7061.11 (codenamed Denali). Terminal version v0.5.0988",
+            "version": lambda args: "FranchukOS version 29.1.7062.29 (codenamed Denali). Terminal version v0.5.12831.0",
         }
 
     def handle_enter(self, event):
