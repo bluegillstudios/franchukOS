@@ -22,7 +22,7 @@ def snake_game():
     pygame.display.set_caption("Snake v3.3")
 
     # Clock for controlling the game's FPS
-    clock = pygame.time.Clock(60)
+    clock = pygame.time.Clock()
 
     # Define fonts
     font_style = pygame.font.SysFont(None, 30)

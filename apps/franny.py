@@ -8,8 +8,8 @@ from PyQt5.QtWebEngineWidgets import *
 import json
 import os
 
-BOOKMARKS_PATH = "../config/bookmarks.json"
-HISTORY_PATH = "../config/history.json"
+BOOKMARKS_PATH = "config/bookmarks.json"
+HISTORY_PATH = "config/history.json"
 
 class FrannyBrowser(QMainWindow):
     def __init__(self):
@@ -18,11 +18,11 @@ class FrannyBrowser(QMainWindow):
         self.setWindowTitle("Franny Browser (13.0.1224.97)")
         self.setGeometry(100, 100, 1024, 768)
 
+        self.tabs = QTabWidget(self)
+        self.setCentralWidget(self.tabs)  # <-- Set the tab widget as central
+
         self.browser = QWebEngineView(self)
         self.browser.setUrl(QUrl("https://www.google.com"))
-        self.setCentralWidget(self.browser)
-
-        self.tabs = QTabWidget(self)
         self.tabs.addTab(self.browser, "New Tab")
 
         self.browser.urlChanged.connect(self.update_history)

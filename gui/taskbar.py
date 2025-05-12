@@ -8,7 +8,16 @@ from threading import Thread
 from datetime import datetime
 from apps.file_explorer import FileExplorer
 from apps.terminal import Terminal
+from apps.settings import SettingsApp
+from apps.clock import ClockApp
+from apps.insider import Insider
+from apps.outsider import Outsider
+from apps.games.snake import snake_game as SnakeGame
+from apps.games.spi import SpaceInvaders
+from apps.games.aloha import AlohaGameGUI as Aloha
 import playsound
+import subprocess
+import sys
 
 class WindowManager:
     def __init__(self, taskbar):
@@ -18,7 +27,11 @@ class WindowManager:
 
     def open_window(self, window_name, window_class):
         if window_name not in self.open_windows:
-            window = window_class(self.taskbar, window_name, self)
+            # Some apps require a parent, others do not
+            try:
+                window = window_class(self.taskbar)
+            except TypeError:
+                window = window_class()
             window.grab_set()  # Block interactions with other windows until this one is closed.
             self.open_windows[window_name] = window
             self.taskbar.add_taskbar_button(window_name)
@@ -37,13 +50,12 @@ class WindowManager:
 
     def switch_to_window(self, window_name):
         # Hide the currently active window if any
-        if self.active_window:
+        if self.active_window and self.active_window.winfo_exists():
             self.active_window.withdraw()
-
         # Show the new window and make it active
         self.active_window = self.open_windows[window_name]
-        self.active_window.deiconify()  # Show the window again
-        self.taskbar.update_taskbar_button(window_name)  # Update taskbar to show active window
+        self.active_window.deiconify()
+        self.taskbar.update_taskbar_button(window_name)
 
 class AppWindow(tk.Toplevel):
     def __init__(self, parent, window_name, window_manager):
@@ -96,11 +108,11 @@ class AppWindow(tk.Toplevel):
     def close(self):
         self.window_manager.close_window(self.title())  # Close the window and remove it from the window manager
 
-class Taskbar(tk.Tk):
-    def __init__(self):
-        super().__init__()
-        self.title("FranchukOS Taskbar")
-        self.geometry("800x50")
+class Taskbar(tk.Frame):
+    def __init__(self, parent):
+        super().__init__(parent)
+        # self.title("Taskbar")
+        # self.geometry("800x50")  
         self.configure(bg="black")
 
         self.window_manager = WindowManager(self)
@@ -127,14 +139,23 @@ class Taskbar(tk.Tk):
         return datetime.now().strftime("%H:%M:%S")
 
     def update_time(self):
-        while True:
-            time.sleep(1)
-            self.clock_label.config(text=self.get_time())
-
+        self.clock_label.configure(text=self.get_time())
+        self.after(1000, self.update_time)  
+        
     def show_start_menu(self):
         menu = tk.Menu(self, tearoff=0, bg="black", fg="lime")
         menu.add_command(label="File Explorer", command=self.launch_file_explorer)
         menu.add_command(label="Terminal", command=self.launch_terminal)
+        menu.add_command(label="Insider", command=self.launch_insider)
+        menu.add_command(label="Outsider", command=self.launch_outsider)
+        menu.add_command(label="Franny", command=self.launch_franny)
+        menu.add_command(label="Clock", command=self.launch_clock)
+        menu.add_separator()
+        menu.add_command(label="Snake", command=self.launch_snake)
+        menu.add_command(label="Space Invaders", command=self.launch_space_invaders)
+        menu.add_command(label="Aloha", command=self.launch_aloha)
+        menu.add_separator()
+        menu.add_command(label="Settings", command=self.launch_settings)
         menu.add_separator()
         menu.add_command(label="Exit", command=self.exit_os)
 
@@ -176,9 +197,28 @@ class Taskbar(tk.Tk):
 
     def launch_file_explorer(self):
         self.window_manager.open_window("File Explorer", FileExplorer)
-
     def launch_terminal(self):
         self.window_manager.open_window("Terminal", Terminal)
+    def launch_settings(self):
+        self.window_manager.open_window("Settings", SettingsApp)
+    def launch_clock(self):
+        self.window_manager.open_window("Clock", ClockApp)
+    def launch_insider(self):
+        self.window_manager.open_window("Insider", Insider)
+    def launch_outsider(self):
+        self.window_manager.open_window("Outsider", Outsider)
+    def launch_franny(self):
+        try:
+            subprocess.Popen([sys.executable, "apps/franny.py"])
+        except Exception as e:
+            print(f"Failed to launch FrannyBrowser: {e}")
+    def launch_snake(self):
+        self.window_manager.open_window("Snake", SnakeGame)
+    def launch_space_invaders(self):
+        self.window_manager.open_window("Space Invaders", SpaceInvaders)
+    def launch_aloha(self):
+        self.window_manager.open_window("Aloha", Aloha)
+    
 
 if __name__ == "__main__":
     taskbar = Taskbar()

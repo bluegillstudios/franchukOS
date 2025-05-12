@@ -2,8 +2,8 @@
 # Contributed under the Apache License, Version 2.0.
 
 import tkinter as tk
-from gui.taskbar import Taskbar
-from gui.utils import set_background_image
+from PIL import Image, ImageTk
+from gui.taskbar import Taskbar, WindowManager
 from apps.file_explorer import FileExplorer
 from apps.terminal import Terminal
 from apps.settings import SettingsApp
@@ -11,106 +11,94 @@ from apps.clock import ClockApp
 from apps.insider import Insider
 from apps.outsider import Outsider
 from apps.franny import FrannyBrowser
-from apps.games.snake import SnakeGame
+from apps.games.snake import snake_game as SnakeGame
 from apps.games.spi import SpaceInvaders
-from apps.games.aloha import Aloha
-from gui.taskbar import WindowManager
+from apps.games.aloha import AlohaGameGUI as Aloha
 
-
-class Desktop:
+class Desktop(tk.Tk):
     def __init__(self):
-        self.root = tk.Tk()
-        self.root.title("FranchukOS")
-        self.root.geometry("1024x768")
-        self.root.configure(bg="black")
-        self.root.overrideredirect(False)  
+        super().__init__()
+        self.title("FranchukOS Desktop")
+        self.geometry("1200x800")  # Starting size for the window
+        self.resizable(True, True)  # Allow resizing the window
 
-        set_background_image(self.root, "assets/backgrounds/wallpaper.png")
+        # Initialize window manager here instead of passing to taskbar
+        self.window_manager = WindowManager(self)
 
-        self.window_manager = WindowManager(self.root)
-        self.taskbar = Taskbar(self.root, self.window_manager)
+        # Only pass the window to Taskbar if that's the expected argument
+        self.taskbar = Taskbar(self)
 
-        # Add Games Dropdown
-        self.create_games_dropdown()
+        self.icons = []
+        self.icon_images = [] 
+        self.wallpaper_label = None
+        self.set_wallpaper("assets/backgrounds/wallpaper.png")
+        self.setup_ui()
 
-        self.create_desktop_icons()
+    def set_wallpaper(self, path):
+        try:
+            wallpaper_img = Image.open(path)
+            screen_width = self.winfo_screenwidth()
+            screen_height = self.winfo_screenheight()
+            wallpaper_img = wallpaper_img.resize((screen_width, screen_height), Image.LANCZOS)
+            self.wallpaper_photo = ImageTk.PhotoImage(wallpaper_img)
 
-    def create_games_dropdown(self):
-        """Create a dropdown menu for the games in the taskbar."""
-        games_menu = tk.Menu(self.root)
-        self.root.config(menu=games_menu)
+            self.wallpaper_label = tk.Label(self, image=self.wallpaper_photo)
+            self.wallpaper_label.place(x=0, y=0, relwidth=1, relheight=1)
+        except Exception as e:
+            print(f"Could not load wallpaper from {path}: {e}")
+            self.configure(bg="black")
 
-        games = tk.Menu(games_menu, tearoff=0)
-        games.add_command(label="Aloha", command=self.launch_aloha)
-        games.add_command(label="Snake", command=self.launch_snake)
-        games.add_command(label="Space Invaders", command=self.launch_space_invaders)
-        
-        games_menu.add_cascade(label="Games", menu=games)
+    def setup_ui(self):
+        # Place icons on top of wallpaper
+        self.icon_container = tk.Frame(self, bg="", bd=0)
+        self.icon_container.place(relx=0, rely=0)
 
-    def create_desktop_icons(self):
-        """Create icons for all apps on the desktop."""
-        self.icon_frame = tk.Frame(self.root, bg="black")
-        self.icon_frame.pack(side="top", fill="both", expand=True)
-
-        screen_width = self.root.winfo_width()
-        screen_height = self.root.winfo_height()
-
-        icon_spacing = 20
-        cols = max(screen_width // 100, 5)
-        rows = max(screen_height // 100, 4)
-
-        icon_width = (screen_width - (cols + 1) * icon_spacing) // cols
-        icon_height = (screen_height - (rows + 1) * icon_spacing) // rows
-
-        app_info = [
-            ("gui/icons/file_explorer_icon.png", "File Explorer", FileExplorer),
-            ("gui/icons/terminal_icon.png", "Terminal", Terminal),
-            ("gui/icons/settings_icon.png", "Settings", SettingsApp),
-            ("gui/icons/clock_icon.png", "Clock", ClockApp),
-            ("gui/icons/insider_icon.png", "Insider", Insider),
-            ("gui/icons/outsider_icon.png", "Outsider", Outsider),
-            ("gui/icons/franny_icon.png", "Browse the Web", FrannyBrowser)
+        apps = [
+            ("Terminal", "assets/icons/apps/terminal.png", Terminal),
+            ("File Explorer", "assets/icons/apps/files.png", FileExplorer),
+            ("Settings", "assets/icons/apps/settings.png", SettingsApp),
+            ("Clock", "assets/icons/apps/clock.png", ClockApp),
+            ("Insider", "assets/icons/apps/insider.png", Insider),
+            ("Outsider", "assets/icons/apps/viewer.png", Outsider),
+            ("Franny", "assets/icons/apps/franny.png", FrannyBrowser),
+            ("Snake", "assets/icons/games/snake.jpg", SnakeGame),
+            ("Space Invaders", "assets/icons/games/spi.jpg", SpaceInvaders),
+            ("Aloha", "assets/icons/games/aloha.jpg", Aloha),
         ]
 
-        for i, (icon_path, app_name, app_class) in enumerate(app_info):
-            row = i // cols
-            col = i % cols
+        for idx, (name, icon_path, app_class) in enumerate(apps):
+            self.create_icon(name, icon_path, app_class, row=idx//5, col=idx%5)
 
-            icon_image = tk.PhotoImage(file=icon_path)
-            button = tk.Button(
-                self.icon_frame,
-                image=icon_image,
-                text=app_name,
-                compound="top",
-                width=icon_width,
-                height=icon_height,
-                relief="solid",
-                borderwidth=2,
-                bg="black",
-                fg="lime",
-                font=("Courier", 10),
-                command=lambda app_class=app_class, app_name=app_name: self.launch_app(app_class, app_name)
-            )
-            button.grid(row=row, column=col, padx=icon_spacing, pady=icon_spacing)
-            button.image = icon_image
+        self.taskbar.lift()
+        self.taskbar.pack(side=tk.BOTTOM, fill=tk.X)
 
-    def launch_app(self, app_class, app_name):
-        """Launch an app by calling its class."""
-        self.window_manager.open_window(app_name, app_class)
+    def create_icon(self, name, icon_path, app_class, row, col):
+        try:
+            icon_img = Image.open(icon_path).resize((64, 64), Image.LANCZOS)
+            icon_photo = ImageTk.PhotoImage(icon_img)
+        except Exception as e:
+            print(f"Failed to load icon '{name}' from {icon_path}: {e}")
+            return
 
-    def launch_snake(self):
-        """Launch the Snake game."""
-        self.window_manager.open_window("Snake", SnakeGame)
+        icon_frame = tk.Frame(self.icon_container, bg="#000000", bd=0)
+        icon_frame.place(x=40 + col * 100, y=40 + row * 100)
 
-    def launch_space_invaders(self):
-        """Launch the Space Invaders game."""
-        self.window_manager.open_window("Space Invaders", SpaceInvaders)
+        icon_button = tk.Button(
+            icon_frame,
+            image=icon_photo,
+            command=lambda: self.window_manager.launch(app_class),
+            bd=0,
+            bg="#000000",
+            activebackground="#222222"
+        )
+        icon_button.pack()
 
-    def launch_aloha(self):
-        """Launch the Aloha game."""
-        self.window_manager.open_window("Aloha", Aloha)
+        label = tk.Label(icon_frame, text=name, fg="white", bg="#000000", font=("Arial", 10))
+        label.pack()
 
-    def run(self):
-        """Run the desktop."""
-        self.root.mainloop()
+        self.icons.append(icon_frame)
+        self.icon_images.append(icon_photo)  
 
+if __name__ == "__main__":
+    desktop = Desktop()
+    desktop.mainloop()

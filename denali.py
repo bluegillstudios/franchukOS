@@ -2,37 +2,59 @@
 # Contributed under the Apache License, Version 2.0.
 
 import tkinter as tk
-from tkinter import messagebox
-from playsound import playsound
+import threading
+from gui.login import LoginApp  
 from desktop import Desktop
 from gui.taskbar import Taskbar
-from gui.login import LoginApp
+import pygame
 
-def start_startup_sound():
-    """Play the startup sound when the OS starts up."""
-    playsound("assets/sounds/startup.wav")  
+SPLASH_DURATION = 3  # seconds
 
-def launch_desktop():
-    """Launch the desktop and taskbar after login."""
-    desktop = Desktop()  # Create the desktop app instance
-    taskbar = Taskbar(desktop.root)  # Create taskbar for the desktop
-    taskbar.start()  # Start the taskbar
-    desktop.run()  # Run the desktop GUI loop
+def show_splash(next_step_callback):
+    splash = tk.Tk()
+    splash.overrideredirect(False)
+    splash.attributes('-fullscreen', True)
+    splash.configure(bg="black")
 
-def launch_login():
-    """Launch the login screen and handle successful login."""
-    login_app = LoginApp()
+    label = tk.Label(
+        splash,
+        text="FranchukOS",
+        font=("Helvetica", 32, "bold"),
+        bg="black",
+        fg="skyblue"
+    )
+    label.pack(expand=True)
 
-    # Check login result
-    login_app.run()  # Wait for the login screen to run and get user login
+    # Play startup sound in a thread
+    def play_startup_sound():
+        pygame.mixer.init()
+        pygame.mixer.music.load("assets/sounds/startup.wav")
+        pygame.mixer.music.play()
+    threading.Thread(
+        target=play_startup_sound,
+        daemon=True
+    ).start()
 
-    # If login is successful, launch the desktop
-    launch_desktop()
+    def close_splash():
+        splash.destroy()
+        next_step_callback()
+
+    splash.after(SPLASH_DURATION * 1000, close_splash)
+    splash.mainloop()
+
+def start_login():
+    login = LoginApp()
+    login.run()  # Wait for login to complete
+
+    # Logged in, proceed to desktop
+    # Initialize the desktop and taskbar
+    desktop = Desktop()
+    taskbar = Taskbar()
+    desktop.run()
+    taskbar.run()
 
 def main():
-    """Main entry point for FranchukOS."""
-    start_startup_sound()  # Play the startup sound when booted
-    launch_login()  # Proceed to the login screen
+    show_splash(start_login)
 
 if __name__ == "__main__":
     main()

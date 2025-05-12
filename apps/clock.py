@@ -11,8 +11,6 @@ import playsound
 class ClockApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Clock")
-        self.root.geometry("400x400")
         self.root.configure(bg="black")
 
         # Clock Label

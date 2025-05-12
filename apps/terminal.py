@@ -1,6 +1,6 @@
-# Copyright 2025 the FranchukOS project authors. 
+# Copyright 2025 the FranchukOS project authors.
 # Contributed under the Apache License, Version 2.0.
-# Terminal application for FranchukOS
+# Enhanced Terminal for FranchukOS
 
 import tkinter as tk
 import code
@@ -9,22 +9,31 @@ import io
 import os
 import shutil
 import platform
-import psutil # type: ignore
+import psutil
 import datetime
+import time
+import getpass
 
 class Terminal(tk.Toplevel):
+    PROMPT = ">>> "
+
     def __init__(self, master=None):
         super().__init__(master)
         self.title("Terminal")
-        self.geometry("600x400")
+        self.geometry("700x450")
         self.configure(bg="black")
 
-        self.text = tk.Text(self, bg="black", fg="lime", insertbackground="white", font=("Courier", 10))
+        self.text = tk.Text(self, bg="black", fg="lime", insertbackground="white",
+                            font=("Courier New", 11), undo=True, wrap="word")
         self.text.pack(fill="both", expand=True)
-        self.text.insert("end", "Terminal\n>>> ")
+        self.text.insert("end", "Terminal\n" + self.PROMPT)
         self.text.bind("<Return>", self.handle_enter)
+        self.text.bind("<Up>", self.history_up)
+        self.text.bind("<Down>", self.history_down)
 
         self.cmd_buffer = ""
+        self.cmd_history = []
+        self.history_index = -1
         self.interpreter = code.InteractiveInterpreter()
 
         self.commands = {
@@ -53,144 +62,98 @@ class Terminal(tk.Toplevel):
             "arch": self.show_architecture,
             "python": self.run_python_interpreter,
             "help": self.show_help,
+            "version": lambda args: "FranchukOS version 29.0.7061.11 (codenamed Denali). Terminal version v0.5.0988",
         }
 
     def handle_enter(self, event):
-        line = self.text.get("insert linestart", "insert lineend").strip(">>> ")
+        index = self.text.index("insert linestart")
+        line = self.text.get(index, "insert lineend").strip()
+        if line.startswith(self.PROMPT):
+            code_line = line[len(self.PROMPT):].strip()
+        else:
+            code_line = line.strip()
         self.text.insert("end", "\n")
-        output = self.run_code(line)
+        self.cmd_history.append(code_line)
+        self.history_index = len(self.cmd_history)
+        output = self.run_code(code_line)
         if output:
-            self.text.insert("end", output)
-        self.text.insert("end", ">>> ")
+            self.text.insert("end", output.strip() + "\n")
+        self.text.insert("end", self.PROMPT)
         self.text.see("end")
         return "break"
 
+    def history_up(self, event):
+        if self.cmd_history and self.history_index > 0:
+            self.history_index -= 1
+            self.replace_current_line(self.cmd_history[self.history_index])
+        return "break"
+
+    def history_down(self, event):
+        if self.cmd_history and self.history_index < len(self.cmd_history) - 1:
+            self.history_index += 1
+            self.replace_current_line(self.cmd_history[self.history_index])
+        else:
+            self.replace_current_line("")
+        return "break"
+
+    def replace_current_line(self, text):
+        self.text.delete("insert linestart + {}c".format(len(self.PROMPT)), "insert lineend")
+        self.text.insert("insert", text)
+
     def run_code(self, code_line):
-        # Check if it is a predefined command
-        if code_line in self.commands:
-            return self.commands[code_line]()
-        # Otherwise, treat it as regular Python code
-        stdout = sys.stdout
-        sys.stdout = buffer = io.StringIO()
-        try:
-            self.interpreter.runsource(code_line)
-        except Exception as e:
-            print(e)
-        sys.stdout = stdout
-        return buffer.getvalue()
+        if not code_line:
+            return ""
+        parts = code_line.split()
+        cmd, args = parts[0], parts[1:]
 
-    def list_files(self):
-        try:
-            return "\n".join(os.listdir(os.getcwd()))  # List files in the current directory
-        except Exception as e:
-            return f"Error: {str(e)}"
+        if cmd in self.commands:
+            try:
+                return self.commands[cmd](args)
+            except Exception as e:
+                return f"Error: {str(e)}"
+        else:
+            # Try as Python code
+            stdout = sys.stdout
+            sys.stdout = buffer = io.StringIO()
+            try:
+                self.interpreter.runsource(code_line)
+            except Exception as e:
+                print(e)
+            sys.stdout = stdout
+            return buffer.getvalue()
 
-    def clear_terminal(self):
-        self.text.delete(1.0, "end")
-        self.text.insert("end", "Terminal\n>>> ")
-
-    def quit_terminal(self):
-        self.destroy()
-
-    def print_working_directory(self):
-        return os.getcwd()
-
-    def change_directory(self, path):
-        try:
-            os.chdir(path)
-            return f"Changed directory to {os.getcwd()}"
-        except Exception as e:
-            return f"Error: {str(e)}"
-
-    def make_directory(self, dir_name):
-        try:
-            os.makedirs(dir_name)
-            return f"Directory '{dir_name}' created."
-        except Exception as e:
-            return f"Error: {str(e)}"
-
-    def remove_directory(self, dir_name):
-        try:
-            os.rmdir(dir_name)
-            return f"Directory '{dir_name}' removed."
-        except Exception as e:
-            return f"Error: {str(e)}"
-
-    def remove_file(self, file_name):
-        try:
-            os.remove(file_name)
-            return f"File '{file_name}' removed."
-        except Exception as e:
-            return f"Error: {str(e)}"
-
-    def copy_file(self, source, destination):
-        try:
-            shutil.copy(source, destination)
-            return f"Copied from {source} to {destination}"
-        except Exception as e:
-            return f"Error: {str(e)}"
-
-    def move_file(self, source, destination):
-        try:
-            shutil.move(source, destination)
-            return f"Moved from {source} to {destination}"
-        except Exception as e:
-            return f"Error: {str(e)}"
-
-    def cat_file(self, file_name):
-        try:
-            with open(file_name, "r") as f:
-                return f.read()
-        except Exception as e:
-            return f"Error: {str(e)}"
-
-    def echo_text(self, text):
-        return text
-
-    def show_time(self):
-        return time.strftime("%H:%M:%S")
-
-    def show_date(self):
-        return time.strftime("%Y-%m-%d")
-
-    def show_disk_space(self):
-        total, used, free = shutil.disk_usage("/")
-        return f"Total: {total // (2**30)} GB, Used: {used // (2**30)} GB, Free: {free // (2**30)} GB"
-
-    def show_memory_info(self):
-        memory = psutil.virtual_memory()
-        return f"Total: {memory.total // (2**30)} GB, Available: {memory.available // (2**30)} GB, Used: {memory.used // (2**30)} GB"
-
-    def show_uptime(self):
-        uptime = datetime.timedelta(seconds=int(time.time() - psutil.boot_time()))
-        return f"Uptime: {uptime}"
-
-    def show_processes(self):
-        processes = "\n".join([f"{p.info['pid']} - {p.info['name']}" for p in psutil.process_iter(['pid', 'name'])])
-        return processes
-
-    def kill_process(self, pid):
-        try:
-            process = psutil.Process(pid)
-            process.terminate()
-            return f"Terminated process {pid}"
-        except Exception as e:
-            return f"Error: {str(e)}"
-
-    def show_current_user(self):
-        return os.getlogin()
-
-    def show_hostname(self):
-        return platform.node()
-
-    def show_ip_address(self):
-        return os.popen('hostname -I').read().strip()
-
-    def show_architecture(self):
-        return platform.architecture()[0]
-
-    def run_python_interpreter(self):
-        return "Entering Python interpreter (type 'exit()' to exit)."
-
-    def show_help(self):
-        return "\n".join(self.commands.keys())
+    # Command Implementations
+    def list_files(self, args): return "\n".join(os.listdir(os.getcwd()))
+    def clear_terminal(self, args): self.text.delete(1.0, "end"); return "Terminal"
+    def quit_terminal(self, args): self.destroy(); return ""
+    def print_working_directory(self, args): return os.getcwd()
+    def change_directory(self, args): os.chdir(args[0]); return f"Changed to {os.getcwd()}"
+    def make_directory(self, args): os.makedirs(args[0]); return f"Directory '{args[0]}' created."
+    def remove_directory(self, args): os.rmdir(args[0]); return f"Directory '{args[0]}' removed."
+    def remove_file(self, args): os.remove(args[0]); return f"File '{args[0]}' removed."
+    def copy_file(self, args): shutil.copy(args[0], args[1]); return f"Copied {args[0]} to {args[1]}"
+    def move_file(self, args): shutil.move(args[0], args[1]); return f"Moved {args[0]} to {args[1]}"
+    def cat_file(self, args): return open(args[0]).read()
+    def echo_text(self, args): return " ".join(args)
+    def show_time(self, args): return time.strftime("%H:%M:%S")
+    def show_date(self, args): return time.strftime("%Y-%m-%d")
+    def show_disk_space(self, args):
+        t, u, f = shutil.disk_usage("/")
+        return f"Total: {t//(2**30)} GB, Used: {u//(2**30)} GB, Free: {f//(2**30)} GB"
+    def show_memory_info(self, args):
+        m = psutil.virtual_memory()
+        return f"Total: {m.total//(2**30)} GB, Available: {m.available//(2**30)} GB, Used: {m.used//(2**30)} GB"
+    def show_uptime(self, args):
+        return str(datetime.timedelta(seconds=int(time.time() - psutil.boot_time())))
+    def show_processes(self, args):
+        return "\n".join(f"{p.info['pid']} - {p.info['name']}" for p in psutil.process_iter(['pid', 'name']))
+    def kill_process(self, args):
+        pid = int(args[0])
+        psutil.Process(pid).terminate()
+        return f"Terminated process {pid}"
+    def show_current_user(self, args): return getpass.getuser()
+    def show_hostname(self, args): return platform.node()
+    def show_ip_address(self, args): return os.popen('hostname -I').read().strip()
+    def show_architecture(self, args): return platform.architecture()[0]
+    def run_python_interpreter(self, args): return "Python interpreter ready. Use 'exit()' to quit."
+    def show_help(self, args): return "\n".join(self.commands.keys())

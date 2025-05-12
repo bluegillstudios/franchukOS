@@ -6,35 +6,47 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from PIL import Image, ImageTk, ExifTags
+from tkinterdnd2 import DND_FILES, TkinterDnD
+import playsound
+
+BUTTON_STYLE = {
+    "bg": "#222",
+    "fg": "#eee",
+    "activebackground": "#444",
+    "activeforeground": "#fff",
+    "relief": tk.FLAT,
+    "bd": 0,
+    "padx": 10,
+    "pady": 5
+}
 
 
 class Outsider:
-    def __init__(self):
-        self.root = tk.Toplevel()
+    def __init__(self, parent=None):
+        if parent is None:
+            self.root = TkinterDnD.Tk()
+            enable_dnd = True
+        else:
+            self.root = tk.Toplevel(parent)
+            enable_dnd = False
+
         self.root.title("Outsider v1.14")
-        self.root.geometry("800x600")
-        self.root.configure(bg="black")
+        self.root.geometry("1000x700")
+        self.root.configure(bg="#111")
         self.root.bind("<Control-w>", lambda e: self.root.destroy())
 
-        self.image_label = tk.Label(self.root, bg="black")
-        self.image_label.pack(expand=True)
+        self.image_frame = tk.Frame(self.root, bg="#111", bd=2)
+        self.image_frame.pack(expand=True, fill="both", padx=8, pady=8)
+
+        self.image_label = tk.Label(self.image_frame, bg="#111")
+        self.image_label.pack(expand=True, fill="both")
         self.image_label.bind("<Button-3>", self.show_metadata)
 
-        self.image_label.drop_target_register(tk.DND_FILES)
-        self.image_label.dnd_bind("<<Drop>>", self.on_drop)
+        if enable_dnd:
+            self.image_label.drop_target_register(DND_FILES)
+            self.image_label.dnd_bind("<<Drop>>", self.on_drop)
 
-        self.toolbar = tk.Frame(self.root, bg="gray")
-        self.toolbar.pack(side="bottom", fill="x")
-
-        tk.Button(self.toolbar, text="Open", command=self.open_image).pack(side="left")
-        tk.Button(self.toolbar, text="Previous", command=self.show_previous).pack(side="left")
-        tk.Button(self.toolbar, text="Next", command=self.show_next).pack(side="left")
-        tk.Button(self.toolbar, text="Zoom In", command=self.zoom_in).pack(side="left")
-        tk.Button(self.toolbar, text="Zoom Out", command=self.zoom_out).pack(side="left")
-        tk.Button(self.toolbar, text="Rotate right", command=self.rotate_right).pack(side="left")
-        tk.Button(self.toolbar, text="Rotate left", command=self.rotate_left).pack(side="left")
-        tk.Button(self.toolbar, text="Slideshow", command=self.toggle_slideshow).pack(side="left")
-        tk.Button(self.toolbar, text="Fullscreen", command=self.toggle_fullscreen).pack(side="left")
+        self.build_toolbar()
 
         self.image_paths = []
         self.current_index = 0
@@ -44,9 +56,30 @@ class Outsider:
         self.fullscreen = False
         self.slideshow_running = False
 
+    def build_toolbar(self):
+        toolbar = tk.Frame(self.root, bg="#222", pady=5)
+        toolbar.pack(side="top", fill="x")
+
+        def add_button(text, cmd):
+            return tk.Button(toolbar, text=text, command=cmd, **BUTTON_STYLE).pack(side="left", padx=4)
+
+        add_button("📂 Open", self.open_image)
+        add_button("⬅ Previous", self.show_previous)
+        add_button("➡ Next", self.show_next)
+        add_button("➕ Zoom In", self.zoom_in)
+        add_button("➖ Zoom Out", self.zoom_out)
+        add_button("🔄 Rotate →", self.rotate_right)
+        add_button("↩ Rotate ←", self.rotate_left)
+        add_button("▶ Slideshow", self.toggle_slideshow)
+        add_button("🖥 Fullscreen", self.toggle_fullscreen)
+
+        tip = tk.Label(self.root, text="Right-click for metadata | Ctrl+W to close", bg="#111", fg="#555", font=("Arial", 9))
+        tip.pack(side="bottom", pady=4)
+
     def open_image(self):
         file_path = filedialog.askopenfilename(
-            filetypes=[("Image Files", "*.png *.jpg *.jpeg *.gif")]
+            filetypes=[("Image Files", "*.png *.jpg *.jpeg *.gif")],
+            parent=self.root
         )
         if file_path:
             self.load_image_group(file_path)
@@ -54,29 +87,38 @@ class Outsider:
     def load_image_group(self, file_path):
         directory = os.path.dirname(file_path)
         self.image_paths = [
-            os.path.join(directory, f)
+            os.path.abspath(os.path.join(directory, f))
             for f in os.listdir(directory)
             if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif'))
         ]
         self.image_paths.sort()
-        self.current_index = self.image_paths.index(file_path)
-        self.load_image(file_path)
+        abs_file_path = os.path.abspath(file_path)
+        if abs_file_path in self.image_paths:
+            self.current_index = self.image_paths.index(abs_file_path)
+            self.load_image(abs_file_path)
+        else:
+            messagebox.showerror("Error", f"Selected file is not a supported image:\n{abs_file_path}")
+            playsound.playsound("assets/sounds/error.wav")
 
     def load_image(self, path):
-        self.original_image = Image.open(path)
-        self.zoom_factor = 1.0
-        self.rotation_angle = 0
-        self.display_image()
+        try:
+            self.original_image = Image.open(path)
+            self.zoom_factor = 1.0
+            self.rotation_angle = 0
+            self.display_image()
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load image:\n{e}")
 
     def display_image(self):
         if self.original_image:
             w, h = self.original_image.size
             resized = self.original_image.resize(
-                (int(w * self.zoom_factor), int(h * self.zoom_factor)), Image.ANTIALIAS
+                (int(w * self.zoom_factor), int(h * self.zoom_factor)), Image.LANCZOS
             )
             rotated = resized.rotate(self.rotation_angle, expand=True)
             self.tk_image = ImageTk.PhotoImage(rotated)
             self.image_label.configure(image=self.tk_image)
+            self.image_label.image = self.tk_image
 
     def show_previous(self):
         if self.image_paths:
@@ -114,13 +156,9 @@ class Outsider:
             self.run_slideshow()
 
     def run_slideshow(self):
-        def loop():
-            while self.slideshow_running:
-                self.show_next()
-                self.root.after(3000)
-                if not self.slideshow_running:
-                    break
-        threading.Thread(target=loop, daemon=True).start()
+        if self.slideshow_running:
+            self.show_next()
+            self.root.after(3000, self.run_slideshow)
 
     def show_metadata(self, event=None):
         if not self.original_image:
