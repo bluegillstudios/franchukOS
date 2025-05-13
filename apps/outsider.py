@@ -5,7 +5,7 @@ import os
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox
-from PIL import Image, ImageTk, ExifTags
+from PIL import Image, ImageTk, ExifTags, ImageEnhance, ImageOps
 from tkinterdnd2 import DND_FILES, TkinterDnD
 import playsound
 
@@ -30,7 +30,7 @@ class Outsider:
             self.root = tk.Toplevel(parent)
             enable_dnd = False
 
-        self.root.title("Outsider v1.14")
+        self.root.title("Outsider v1.87")
         self.root.geometry("1000x700")
         self.root.configure(bg="#111")
         self.root.bind("<Control-w>", lambda e: self.root.destroy())
@@ -73,6 +73,16 @@ class Outsider:
         add_button("▶ Slideshow", self.toggle_slideshow)
         add_button("🖥 Fullscreen", self.toggle_fullscreen)
 
+        # Editing tools
+        add_button("↔ Flip H", self.flip_horizontal)
+        add_button("↕ Flip V", self.flip_vertical)
+        add_button("🌑 Grayscale", self.apply_grayscale)
+        add_button("☀+", lambda: self.adjust_brightness(1.2))
+        add_button("☀-", lambda: self.adjust_brightness(0.8))
+        add_button("🎚+", lambda: self.adjust_contrast(1.2))
+        add_button("🎚-", lambda: self.adjust_contrast(0.8))
+        add_button("🎨 Sepia", self.apply_sepia_filter)
+
         tip = tk.Label(self.root, text="Right-click for metadata | Ctrl+W to close", bg="#111", fg="#555", font=("Arial", 9))
         tip.pack(side="bottom", pady=4)
 
@@ -102,7 +112,7 @@ class Outsider:
 
     def load_image(self, path):
         try:
-            self.original_image = Image.open(path)
+            self.original_image = Image.open(path).convert("RGB")
             self.zoom_factor = 1.0
             self.rotation_angle = 0
             self.display_image()
@@ -176,6 +186,47 @@ class Outsider:
             messagebox.showinfo("Image Metadata", info)
         except Exception as e:
             messagebox.showerror("Error", f"Failed to read metadata:\n{e}")
+
+    def flip_horizontal(self):
+        if self.original_image:
+            self.original_image = self.original_image.transpose(Image.FLIP_LEFT_RIGHT)
+            self.display_image()
+
+    def flip_vertical(self):
+        if self.original_image:
+            self.original_image = self.original_image.transpose(Image.FLIP_TOP_BOTTOM)
+            self.display_image()
+
+    def apply_grayscale(self):
+        if self.original_image:
+            self.original_image = ImageOps.grayscale(self.original_image).convert("RGB")
+            self.display_image()
+
+    def adjust_brightness(self, factor):
+        if self.original_image:
+            enhancer = ImageEnhance.Brightness(self.original_image)
+            self.original_image = enhancer.enhance(factor)
+            self.display_image()
+
+    def adjust_contrast(self, factor):
+        if self.original_image:
+            enhancer = ImageEnhance.Contrast(self.original_image)
+            self.original_image = enhancer.enhance(factor)
+            self.display_image()
+
+    def apply_sepia_filter(self):
+        if self.original_image:
+            img = self.original_image.convert("RGB")
+            pixels = img.load()
+            for y in range(img.height):
+                for x in range(img.width):
+                    r, g, b = pixels[x, y]
+                    tr = int(0.393 * r + 0.769 * g + 0.189 * b)
+                    tg = int(0.349 * r + 0.686 * g + 0.168 * b)
+                    tb = int(0.272 * r + 0.534 * g + 0.131 * b)
+                    pixels[x, y] = (min(tr, 255), min(tg, 255), min(tb, 255))
+            self.original_image = img
+            self.display_image()
 
     def on_drop(self, event):
         file_path = event.data.strip()
