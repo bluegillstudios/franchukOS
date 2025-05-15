@@ -11,6 +11,7 @@ from apps.clock import ClockApp
 from apps.insider import Insider
 from apps.outsider import Outsider
 from apps.franny import FrannyBrowser
+from apps.franpaint import Franpaint
 from apps.games.snake import snake_game as SnakeGame
 from apps.games.spi import SpaceInvaders
 from apps.games.aloha import AlohaGameGUI as Aloha
@@ -31,7 +32,7 @@ class Desktop(tk.Tk):
         self.icons = []
         self.icon_images = [] 
         self.wallpaper_label = None
-        self.set_wallpaper("assets/backgrounds/wallpaper.png")
+        self.set_wallpaper("assets/backgrounds/wallpaper.jpg")
         self.setup_ui()
 
     def set_wallpaper(self, path):
@@ -64,6 +65,7 @@ class Desktop(tk.Tk):
             ("Snake", "assets/icons/games/snake.jpg", SnakeGame),
             ("Space Invaders", "assets/icons/games/spi.jpg", SpaceInvaders),
             ("Aloha", "assets/icons/games/aloha.jpg", Aloha),
+            ("Franpaint", "assets/icons/apps/franpaint.png", Franpaint),
         ]
 
         for idx, (name, icon_path, app_class) in enumerate(apps):

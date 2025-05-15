@@ -8,7 +8,7 @@ import shutil
 from service import backup, update, network
 update_manager = update
 backup_manager = backup
-VERSION_FILE = "../denali/VERSION"
+VERSION_FILE = "../rainier/VERSION"
 BACKUP_DIR = "backups/"
 
 def backup_os():

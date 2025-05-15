@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox, simpledialog
+from tkinter import messagebox, simpledialog, ttk
 from config.manager import load_profiles, save_profiles
 from PIL import Image, ImageTk 
 from playsound import playsound
@@ -8,7 +8,7 @@ import pygame
 
 class LoginApp:
     def __init__(self):
-        self.profiles = load_profiles()  # Load profiles from the config file
+        self.profiles = load_profiles()
         self.root = tk.Tk()
         self.root.title("Login")
         self.root.attributes("-fullscreen", True)
@@ -16,7 +16,7 @@ class LoginApp:
 
         self.wallpaper_path = "assets/backgrounds/login.png"
         self.background_label = None
-        self.wallpaper_image = None  # Keep a reference to avoid garbage collection
+        self.wallpaper_image = None
 
         self.set_login_wallpaper(self.wallpaper_path)
         self.root.bind("<Configure>", self.on_resize)
@@ -24,7 +24,6 @@ class LoginApp:
         self.build_ui()
 
     def set_login_wallpaper(self, wallpaper_path):
-        """Set a background wallpaper for the login screen."""
         width = self.root.winfo_width() or 500
         height = self.root.winfo_height() or 300
         wallpaper = Image.open(wallpaper_path)
@@ -36,46 +35,50 @@ class LoginApp:
             self.background_label.place(relwidth=1, relheight=1)
         else:
             self.background_label.configure(image=self.wallpaper_image)
-        self.background_label.image = self.wallpaper_image  # Keep a reference
+        self.background_label.image = self.wallpaper_image
 
     def on_resize(self, event):
-        # Only resize if the window size actually changed
         if event.widget == self.root:
             self.set_login_wallpaper(self.wallpaper_path)
 
     def build_ui(self):
-        """Build the login UI components."""
-        title = tk.Label(self.root, text="Login", font=("Segoe UI", 20), bg="black", fg="white")
-        title.pack(pady=10)
+        style = ttk.Style()
+        style.theme_use('clam')
+        style.configure("TFrame", background="#000000", relief="flat")
+        style.configure("TLabel", background="#000000", foreground="white", font=("Segoe UI", 14))
+        style.configure("TButton", font=("Segoe UI", 12), padding=6)
+        style.configure("TEntry", font=("Segoe UI", 12))
 
-        # Username input
-        self.username_label = tk.Label(self.root, text="Username:", bg="black", fg="white")
+        container = ttk.Frame(self.root, padding=20)
+        container.place(relx=0.5, rely=0.5, anchor="center")
+
+        title = ttk.Label(container, text="Welcome to FranchukOS", font=("Segoe UI", 24, "bold"))
+        title.pack(pady=20)
+
+        self.username_label = ttk.Label(container, text="Username:")
         self.username_label.pack(pady=5)
 
-        self.username_entry = tk.Entry(self.root)
+        self.username_entry = ttk.Entry(container, width=30)
         self.username_entry.pack(pady=5)
 
-        # Password input
-        self.password_label = tk.Label(self.root, text="Password:", bg="black", fg="white")
+        self.password_label = ttk.Label(container, text="Password:")
         self.password_label.pack(pady=5)
 
-        self.password_entry = tk.Entry(self.root, show="*")
+        self.password_entry = ttk.Entry(container, show="*", width=30)
         self.password_entry.pack(pady=5)
 
-        # Login button
-        self.login_button = tk.Button(self.root, text="Login", command=self.login, width=20)
+        self.login_button = ttk.Button(container, text="Login", command=self.login)
         self.login_button.pack(pady=10)
 
-        # New User button
-        self.new_user_button = tk.Button(self.root, text="New User", command=self.new_user, width=20)
-        self.new_user_button.pack(pady=10)
+        self.new_user_button = ttk.Button(container, text="New User", command=self.new_user)
+        self.new_user_button.pack(pady=5)
+
+        self.root.bind("<Return>", lambda event: self.login())
 
     def login(self):
-        """Handle the login process."""
         username = self.username_entry.get()
         password = self.password_entry.get()
 
-        # Check credentials
         users = self.profiles.values() if isinstance(self.profiles, dict) else self.profiles
         for user in users:
             if isinstance(user, dict) and user.get("username") == username and user.get("password") == password:
@@ -83,17 +86,15 @@ class LoginApp:
                 pygame.mixer.music.load("assets/sounds/login.wav")
                 pygame.mixer.music.play()
                 messagebox.showinfo("Login Successful", f"Welcome, {username}!")
-                self.root.destroy()  # Close login window
+                self.root.destroy()
                 return
 
-        # If credentials are incorrect
         messagebox.showerror("Login Failed", "Invalid username or password.")
 
     def new_user(self):
-        """Allow new user registration."""
         username = simpledialog.askstring("New User", "Enter new username:", parent=self.root)
         if username is None:
-            return  # If the user cancels, do nothing
+            return
 
         users = self.profiles.values() if isinstance(self.profiles, dict) else self.profiles
         for user in users:
@@ -106,9 +107,8 @@ class LoginApp:
 
         password = simpledialog.askstring("New User", "Enter new password:", show="*", parent=self.root)
         if password is None:
-            return  
+            return
 
-        # Add the new user to profiles.json
         new_user = {"username": username, "password": password}
         self.profiles.append(new_user)
         save_profiles(self.profiles)
@@ -118,5 +118,5 @@ class LoginApp:
         pygame.mixer.music.play()
 
     def run(self):
-        """Run the Tkinter main loop."""
         self.root.mainloop()
+        pygame.mixer.quit()
