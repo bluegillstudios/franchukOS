@@ -19,7 +19,7 @@ class Terminal(tk.Toplevel):
 
     def __init__(self, master=None):
         super().__init__(master)
-        self.title("Terminal")
+        self.title("Welcome to the FranchukOS Developer terminal. If you got here by mistake, it's ok! Just close this window and carry on.")
         self.geometry("700x450")
         self.configure(bg="black")
 
@@ -62,7 +62,7 @@ class Terminal(tk.Toplevel):
             "arch": self.show_architecture,
             "python": self.run_python_interpreter,
             "help": self.show_help,
-            "version": lambda args: "FranchukOS version 29.1.7062.29 (codenamed Denali). Terminal version v0.5.12831.0",
+            "version": lambda args: "FranchukOS version 30.0.2291.121 (codenamed Rainier). Terminal version v0.5.16831.2",
         }
 
     def handle_enter(self, event):

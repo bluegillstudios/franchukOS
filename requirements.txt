@@ -4,3 +4,4 @@ tkinterdnd2
 playsound
 PyQt5
 PyQtWebEngine
+matplotlib

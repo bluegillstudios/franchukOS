@@ -119,4 +119,3 @@ class LoginApp:
 
     def run(self):
         self.root.mainloop()
-        pygame.mixer.quit()
