@@ -3,9 +3,9 @@
 
 import tkinter as tk
 import threading
-from gui.login import LoginApp  
+from Graphics.login import LoginApp  
 from desktop import Desktop
-from gui.taskbar import Taskbar
+from Graphics.taskbar import Taskbar
 import pygame
 
 SPLASH_DURATION = 3  # seconds

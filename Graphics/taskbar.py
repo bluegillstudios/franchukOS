@@ -6,15 +6,15 @@ from tkinter import messagebox
 import time
 from threading import Thread
 from datetime import datetime
-from apps.file_explorer import FileExplorer
-from apps.terminal import Terminal
-from apps.settings import SettingsApp
-from apps.clock import ClockApp
-from apps.insider import Insider
-from apps.outsider import Outsider
-from apps.games.snake import snake_game as SnakeGame
-from apps.games.spi import SpaceInvaders
-from apps.games.aloha import AlohaGameGUI as Aloha
+from Applications.file_explorer import FileExplorer
+from Applications.terminal import Terminal
+from Applications.settings import SettingsApp
+from Applications.clock import ClockApp
+from Applications.insider import Insider
+from Applications.outsider import Outsider
+from Applications.games.snake import snake_game as SnakeGame
+from Applications.games.spi import SpaceInvaders
+from Applications.games.aloha import AlohaGameGUI as Aloha
 import playsound
 import subprocess
 import sys

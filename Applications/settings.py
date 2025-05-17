@@ -3,7 +3,7 @@
 
 import tkinter as tk
 from tkinter import ttk
-from gui.utils import set_background_color, set_background_image
+from Graphics.utils import set_background_color, set_background_image
 from config.manager import load_config, save_config
 from core.thememanage import apply_theme
 

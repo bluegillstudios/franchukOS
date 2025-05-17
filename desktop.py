@@ -3,18 +3,18 @@
 
 import tkinter as tk
 from PIL import Image, ImageTk
-from gui.taskbar import Taskbar, WindowManager
-from apps.file_explorer import FileExplorer
-from apps.terminal import Terminal
-from apps.settings import SettingsApp
-from apps.clock import ClockApp
-from apps.insider import Insider
-from apps.outsider import Outsider
-from apps.franny import FrannyBrowser
-from apps.franpaint import Franpaint
-from apps.games.snake import snake_game as SnakeGame
-from apps.games.spi import SpaceInvaders
-from apps.games.aloha import AlohaGameGUI as Aloha
+from Graphics.taskbar import Taskbar, WindowManager
+from Applications.file_explorer import FileExplorer
+from Applications.terminal import Terminal
+from Applications.settings import SettingsApp
+from Applications.clock import ClockApp
+from Applications.insider import Insider
+from Applications.outsider import Outsider
+from Applications.franny import FrannyBrowser
+from Applications.franpaint import Franpaint
+from Applications.games.snake import snake_game as SnakeGame
+from Applications.games.spi import SpaceInvaders
+from Applications.games.aloha import AlohaGameGUI as Aloha
 
 class Desktop(tk.Tk):
     def __init__(self):
