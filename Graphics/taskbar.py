@@ -18,6 +18,7 @@ from Applications.games.aloha import AlohaGameGUI as Aloha
 from Applications.franpaint import Franpaint
 from Applications.taskmgr import TaskManager
 from Applications.franny import FrannyBrowser
+from Applications.birdseye import Birdseye
 import playsound
 import subprocess
 import sys
@@ -155,6 +156,7 @@ class Taskbar(tk.Frame):
         menu.add_command(label="Clock", command=self.launch_clock)
         menu.add_command(label="Franpaint", command=self.launch_franpaint)
         menu.add_command(label="Task Manager", command=self.launch_taskmgr)
+        menu.add_command(label="Birdseye", command=self.launch_birdseye)
         menu.add_separator()
         menu.add_command(label="Snake", command=self.launch_snake)
         menu.add_command(label="Space Invaders", command=self.launch_space_invaders)
@@ -230,6 +232,11 @@ class Taskbar(tk.Frame):
             print(f"Failed to launch Franpaint v1.10: {e}")
     def launch_taskmgr(self):
         self.window_manager.open_window("Task Manager", TaskManager)
+    def launch_birdseye(self):
+        try:
+            subprocess.Popen([sys.executable, "Applications/birdseye.py"])
+        except Exception as e:
+            print(f"Failed to launch Birdseye v1.32: {e}")
     
     
 

@@ -1,8 +1,8 @@
 # Copyright 2025 the FranchukOS project authors.
 # Contributed under the Apache License, Version 2.0.
-# Enhanced Terminal for FranchukOS
 
 import tkinter as tk
+from tkinter import ttk
 import code
 import sys
 import io
@@ -19,14 +19,18 @@ class Terminal(tk.Toplevel):
 
     def __init__(self, master=None):
         super().__init__(master)
-        self.title("Welcome to the FranchukOS Developer terminal. If you got here by mistake, it's ok! Just close this window and carry on.")
-        self.geometry("700x450")
-        self.configure(bg="black")
+        self.title("FranchukOS Terminal v0.7")
+        self.geometry("800x500")
+        self.configure(bg="#1e1e1e")
+        self.style = ttk.Style()
+        self.style.theme_use("clam")
+        self.style.configure("TText", background="#1e1e1e", foreground="#1a5e1a", font=("Consolas", 11))
 
-        self.text = tk.Text(self, bg="black", fg="lime", insertbackground="white",
-                            font=("Courier New", 11), undo=True, wrap="word")
-        self.text.pack(fill="both", expand=True)
-        self.text.insert("end", "Terminal\n" + self.PROMPT)
+        self.text = tk.Text(self, bg="#1e1e1e", fg="#00ff00", insertbackground="white",
+                            font=("Consolas", 11), undo=True, wrap="word",
+                            borderwidth=0, highlightthickness=0, padx=10, pady=10)
+        self.text.pack(fill="both", expand=True, padx=10, pady=10)
+        self.text.insert("end", "Welcome to the Terminal, v0.7\n" + self.PROMPT)
         self.text.bind("<Return>", self.handle_enter)
         self.text.bind("<Up>", self.history_up)
         self.text.bind("<Down>", self.history_down)
@@ -112,7 +116,6 @@ class Terminal(tk.Toplevel):
             except Exception as e:
                 return f"Error: {str(e)}"
         else:
-            # Try as Python code
             stdout = sys.stdout
             sys.stdout = buffer = io.StringIO()
             try:
@@ -123,7 +126,7 @@ class Terminal(tk.Toplevel):
             return buffer.getvalue()
 
     def list_files(self, args): return "\n".join(os.listdir(os.getcwd()))
-    def clear_terminal(self, args): self.text.delete(1.0, "end"); return "Terminal"
+    def clear_terminal(self, args): self.text.delete(1.0, "end"); return "Welcome to FranchukOS Terminal v0.7"
     def quit_terminal(self, args): self.destroy(); return ""
     def print_working_directory(self, args): return os.getcwd()
     def change_directory(self, args): os.chdir(args[0]); return f"Changed to {os.getcwd()}"
@@ -152,7 +155,4 @@ class Terminal(tk.Toplevel):
         return f"Terminated process {pid}"
     def show_current_user(self, args): return getpass.getuser()
     def show_hostname(self, args): return platform.node()
-    def show_ip_address(self, args): return os.popen('hostname -I').read().strip()
-    def show_architecture(self, args): return platform.architecture()[0]
-    def run_python_interpreter(self, args): return "Python interpreter ready. Use 'exit()' to quit."
-    def show_help(self, args): return "\n".join(self.commands.keys())
+    def show_ip_address(self, args): return os.popen('hostname -I').read()

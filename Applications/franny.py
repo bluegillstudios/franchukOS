@@ -5,86 +5,93 @@ import sys
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtWebEngineWidgets import *
+from PyQt5.QtGui import QIcon
 import json
 import os
 
 BOOKMARKS_PATH = "config/bookmarks.json"
 HISTORY_PATH = "config/history.json"
 
+class BrowserTab(QWebEngineView):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setUrl(QUrl("https://www.google.com"))
+
 class FrannyBrowser(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Franny Browser (13.0.1224.97)")
+        self.setWindowTitle("Franny Browser (14.2.4298.121)")
         self.setGeometry(100, 100, 1024, 768)
 
         self.tabs = QTabWidget(self)
-        self.setCentralWidget(self.tabs)  # <-- Set the tab widget as central
+        self.tabs.setTabsClosable(True)
+        self.tabs.setMovable(True)
+        self.tabs.tabCloseRequested.connect(self.close_tab)
+        self.tabs.currentChanged.connect(self.update_address_bar)
+        self.setCentralWidget(self.tabs)
 
-        self.browser = QWebEngineView(self)
-        self.browser.setUrl(QUrl("https://www.google.com"))
-        self.tabs.addTab(self.browser, "New Tab")
+        self.history = self.load_history()
+        self.zoom_level = 1.0
 
-        self.browser.urlChanged.connect(self.update_history)
-
-        # Menu Bar
+        self.init_toolbar()
         self.init_menu()
 
-        # Status Bar
         self.status_bar = QStatusBar(self)
         self.setStatusBar(self.status_bar)
 
-        # History
-        self.history = self.load_history()
+        self.add_new_tab(QUrl("https://www.google.com"), "New Tab")
 
-        # Zoom Level
-        self.zoom_level = 1.0
+    def init_toolbar(self):
+        self.toolbar = QToolBar("Navigation", self)
+        self.toolbar.setIconSize(QSize(16, 16))
+        self.addToolBar(self.toolbar)
+
+        back_btn = QAction(QIcon.fromTheme("go-previous"), "Back", self)
+        back_btn.triggered.connect(lambda: self.current_browser().back())
+        self.toolbar.addAction(back_btn)
+
+        forward_btn = QAction(QIcon.fromTheme("go-next"), "Forward", self)
+        forward_btn.triggered.connect(lambda: self.current_browser().forward())
+        self.toolbar.addAction(forward_btn)
+
+        reload_btn = QAction(QIcon.fromTheme("view-refresh"), "Reload", self)
+        reload_btn.triggered.connect(lambda: self.current_browser().reload())
+        self.toolbar.addAction(reload_btn)
+
+        home_btn = QAction(QIcon.fromTheme("go-home"), "Home", self)
+        home_btn.triggered.connect(self.go_home)
+        self.toolbar.addAction(home_btn)
+
+        self.toolbar.addSeparator()
+
+        self.address_bar = QLineEdit(self)
+        self.address_bar.returnPressed.connect(self.navigate_to_url)
+        self.toolbar.addWidget(self.address_bar)
+
+        new_tab_btn = QAction(QIcon.fromTheme("tab-new"), "New Tab", self)
+        new_tab_btn.triggered.connect(self.new_tab)
+        self.toolbar.addAction(new_tab_btn)
 
     def init_menu(self):
-        """Initialize the menu bar."""
         menu_bar = self.menuBar()
-
-        # File Menu
-        file_menu = menu_bar.addMenu("File")
+        file_menu = menu_bar.addMenu("Options")
         new_tab_action = QAction("New Tab", self)
         new_tab_action.triggered.connect(self.new_tab)
         file_menu.addAction(new_tab_action)
 
-        # Navigation Menu
-        navigation_menu = menu_bar.addMenu("Navigation")
-        back_action = QAction("Back", self)
-        back_action.triggered.connect(self.browser.back)
-        navigation_menu.addAction(back_action)
-
-        forward_action = QAction("Forward", self)
-        forward_action.triggered.connect(self.browser.forward)
-        navigation_menu.addAction(forward_action)
-
-        reload_action = QAction("Reload", self)
-        reload_action.triggered.connect(self.browser.reload)
-        navigation_menu.addAction(reload_action)
-
-        # Incognito Mode
         incognito_action = QAction("Incognito Mode", self)
         incognito_action.triggered.connect(self.toggle_incognito)
         file_menu.addAction(incognito_action)
-
-        # Bookmarks
-        bookmark_menu = menu_bar.addMenu("Bookmarks")
-        self.bookmarks_action = QAction("Bookmarks", self)
-        self.bookmarks_action.triggered.connect(self.show_bookmarks)
-        bookmark_menu.addAction(self.bookmarks_action)
 
         add_bookmark_action = QAction("Add Bookmark", self)
         add_bookmark_action.triggered.connect(self.add_bookmark)
         file_menu.addAction(add_bookmark_action)
 
-        # Clear Data
         clear_data_action = QAction("Clear Data", self)
         clear_data_action.triggered.connect(self.clear_data)
         file_menu.addAction(clear_data_action)
 
-        # Zoom Controls
         zoom_in_action = QAction("Zoom In", self)
         zoom_in_action.triggered.connect(self.zoom_in)
         file_menu.addAction(zoom_in_action)
@@ -93,53 +100,82 @@ class FrannyBrowser(QMainWindow):
         zoom_out_action.triggered.connect(self.zoom_out)
         file_menu.addAction(zoom_out_action)
 
-        # Find in Page
         find_in_page_action = QAction("Find in Page", self)
         find_in_page_action.triggered.connect(self.find_in_page)
         file_menu.addAction(find_in_page_action)
 
+        bookmark_menu = menu_bar.addMenu("Bookmarks")
+        self.bookmarks_action = QAction("Bookmarks", self)
+        self.bookmarks_action.triggered.connect(self.show_bookmarks)
+        bookmark_menu.addAction(self.bookmarks_action)
+
+    def add_new_tab(self, qurl=None, label="New Tab"):
+        browser = BrowserTab(self)
+        browser.setUrl(qurl or QUrl("https://www.google.com"))
+        i = self.tabs.addTab(browser, label)
+        self.tabs.setCurrentIndex(i)
+        browser.urlChanged.connect(lambda url, b=browser: self.update_tab_title(url, b))
+        browser.urlChanged.connect(self.update_history)
+        browser.titleChanged.connect(lambda title, b=browser: self.tabs.setTabText(self.tabs.indexOf(b), title))
+        browser.iconChanged.connect(lambda icon, b=browser: self.tabs.setTabIcon(self.tabs.indexOf(b), icon))
+        browser.loadFinished.connect(lambda: self.update_address_bar(self.tabs.currentIndex()))
+
     def new_tab(self):
-        """Open a new tab in the browser."""
-        new_browser = QWebEngineView(self)
-        new_browser.setUrl(QUrl("https://www.google.com"))
-        self.tabs.addTab(new_browser, "New Tab")
-        self.tabs.setCurrentWidget(new_browser)
-        new_browser.urlChanged.connect(self.update_history)
+        self.add_new_tab(QUrl("https://www.google.com"), "New Tab")
+
+    def close_tab(self, index):
+        if self.tabs.count() > 1:
+            self.tabs.removeTab(index)
+        else:
+            self.close()
+
+    def current_browser(self):
+        return self.tabs.currentWidget()
+
+    def update_tab_title(self, url, browser):
+        if browser:
+            self.tabs.setTabText(self.tabs.indexOf(browser), browser.title() or "New Tab")
+
+    def update_address_bar(self, index):
+        browser = self.tabs.widget(index)
+        if browser:
+            self.address_bar.setText(browser.url().toString())
+
+    def navigate_to_url(self):
+        url = QUrl(self.address_bar.text())
+        if url.scheme() == "":
+            url.setScheme("http")
+        self.current_browser().setUrl(url)
+
+    def go_home(self):
+        self.current_browser().setUrl(QUrl("https://www.google.com"))
 
     def update_history(self, url):
-        """Update the browsing history."""
         self.history.append(url.toString())
         self.save_history()
-
         self.status_bar.showMessage(f"Visited: {url.toString()}")
 
     def toggle_incognito(self):
-        """Toggle incognito mode (private browsing)."""
-        current_browser = self.tabs.currentWidget()
+        current_browser = self.current_browser()
         if current_browser:
-            current_browser.setUrl(QUrl("about:blank"))  # Placeholder URL for incognito mode
+            current_browser.setUrl(QUrl("about:blank"))
             self.status_bar.showMessage("Incognito Mode Enabled")
 
     def show_bookmarks(self):
-        """Show bookmarks."""
         bookmarks = self.load_bookmarks()
         bookmark_dialog = QDialog(self)
         bookmark_dialog.setWindowTitle("Bookmarks")
-
         layout = QVBoxLayout()
         for bookmark in bookmarks:
             button = QPushButton(bookmark, self)
-            button.clicked.connect(lambda url=bookmark: self.load_bookmark(url))
+            button.clicked.connect(lambda _, url=bookmark: self.add_new_tab(QUrl(url), url))
             layout.addWidget(button)
-
         bookmark_dialog.setLayout(layout)
         bookmark_dialog.exec_()
 
     def add_bookmark(self):
-        """Add a new bookmark."""
-        current_url = self.browser.url().toString()
+        current_url = self.current_browser().url().toString()
         bookmarks = self.load_bookmarks()
-
         if current_url not in bookmarks:
             bookmarks.append(current_url)
             self.save_bookmarks(bookmarks)
@@ -148,7 +184,6 @@ class FrannyBrowser(QMainWindow):
             self.status_bar.showMessage("This page is already bookmarked.")
 
     def remove_bookmark(self, url):
-        """Remove a bookmark."""
         bookmarks = self.load_bookmarks()
         if url in bookmarks:
             bookmarks.remove(url)
@@ -158,51 +193,43 @@ class FrannyBrowser(QMainWindow):
             self.status_bar.showMessage("Bookmark not found.")
 
     def load_bookmarks(self):
-        """Load bookmarks from a file."""
         if os.path.exists(BOOKMARKS_PATH):
             with open(BOOKMARKS_PATH, "r") as file:
                 return json.load(file)
         return []
 
     def save_bookmarks(self, bookmarks):
-        """Save bookmarks to a file."""
         with open(BOOKMARKS_PATH, "w") as file:
             json.dump(bookmarks, file)
 
     def save_history(self):
-        """Save the browsing history to a file."""
         with open(HISTORY_PATH, "w") as file:
             json.dump(self.history, file)
 
     def load_history(self):
-        """Load browsing history from a file."""
         if os.path.exists(HISTORY_PATH):
             with open(HISTORY_PATH, "r") as file:
                 return json.load(file)
         return []
 
     def clear_data(self):
-        """Clear browsing history and cache."""
         self.history.clear()
         self.save_history()
-        self.browser.page().profile().clearHttpCache()
+        self.current_browser().page().profile().clearHttpCache()
         self.status_bar.showMessage("Browsing data cleared.")
 
     def zoom_in(self):
-        """Zoom in on the webpage."""
         self.zoom_level += 0.1
-        self.browser.setZoomFactor(self.zoom_level)
+        self.current_browser().setZoomFactor(self.zoom_level)
 
     def zoom_out(self):
-        """Zoom out on the webpage."""
         self.zoom_level -= 0.1
-        self.browser.setZoomFactor(self.zoom_level)
+        self.current_browser().setZoomFactor(self.zoom_level)
 
     def find_in_page(self):
-        """Find text in the current page."""
         search_text, ok = QInputDialog.getText(self, "Find in Page", "Enter text to find:")
         if ok and search_text:
-            self.browser.findText(search_text, QWebEnginePage.FindFlags(QWebEnginePage.FindCaseSensitively))
+            self.current_browser().findText(search_text, QWebEnginePage.FindFlags(QWebEnginePage.FindCaseSensitively))
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
