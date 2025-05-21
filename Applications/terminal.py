@@ -62,7 +62,7 @@ class Terminal(tk.Toplevel):
             "arch": self.show_architecture,
             "python": self.run_python_interpreter,
             "help": self.show_help,
-            "version": lambda args: "FranchukOS version 30.0.2291.121 (codenamed Rainier). Terminal version v0.5.16831.2",
+            "version": lambda args: "FranchukOS version 30.0.2291.121 (codenamed Rainier). Terminal version v0.7.0",
         }
 
     def handle_enter(self, event):
@@ -122,7 +122,6 @@ class Terminal(tk.Toplevel):
             sys.stdout = stdout
             return buffer.getvalue()
 
-    # Command Implementations
     def list_files(self, args): return "\n".join(os.listdir(os.getcwd()))
     def clear_terminal(self, args): self.text.delete(1.0, "end"); return "Terminal"
     def quit_terminal(self, args): self.destroy(); return ""

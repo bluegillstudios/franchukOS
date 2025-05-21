@@ -15,6 +15,9 @@ from Applications.outsider import Outsider
 from Applications.games.snake import snake_game as SnakeGame
 from Applications.games.spi import SpaceInvaders
 from Applications.games.aloha import AlohaGameGUI as Aloha
+from Applications.franpaint import Franpaint
+from Applications.taskmgr import TaskManager
+from Applications.franny import FrannyBrowser
 import playsound
 import subprocess
 import sys
@@ -150,6 +153,8 @@ class Taskbar(tk.Frame):
         menu.add_command(label="Outsider", command=self.launch_outsider)
         menu.add_command(label="Franny", command=self.launch_franny)
         menu.add_command(label="Clock", command=self.launch_clock)
+        menu.add_command(label="Franpaint", command=self.launch_franpaint)
+        menu.add_command(label="Task Manager", command=self.launch_taskmgr)
         menu.add_separator()
         menu.add_command(label="Snake", command=self.launch_snake)
         menu.add_command(label="Space Invaders", command=self.launch_space_invaders)
@@ -209,15 +214,23 @@ class Taskbar(tk.Frame):
         self.window_manager.open_window("Outsider", Outsider)
     def launch_franny(self):
         try:
-            subprocess.Popen([sys.executable, "apps/franny.py"])
+            subprocess.Popen([sys.executable, "Applications/franny.py"])
         except Exception as e:
-            print(f"Failed to launch FrannyBrowser: {e}")
+            print(f"Failed to launch Franny v14.2.4298.121: {e}")
     def launch_snake(self):
         self.window_manager.open_window("Snake", SnakeGame)
     def launch_space_invaders(self):
         self.window_manager.open_window("Space Invaders", SpaceInvaders)
     def launch_aloha(self):
         self.window_manager.open_window("Aloha", Aloha)
+    def launch_franpaint(self):
+        try:
+            subprocess.Popen([sys.executable, "Applications/franpaint.py"])
+        except Exception as e:
+            print(f"Failed to launch Franpaint v1.10: {e}")
+    def launch_taskmgr(self):
+        self.window_manager.open_window("Task Manager", TaskManager)
+    
     
 
 if __name__ == "__main__":

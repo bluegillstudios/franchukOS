@@ -4,8 +4,8 @@
 import tkinter as tk
 from tkinter import ttk
 from Graphics.utils import set_background_color, set_background_image
-from config.manager import load_config, save_config
-from core.thememanage import apply_theme
+from Config.manager import load_config, save_config
+from Core.thememanage import apply_theme
 
 
 OS_VERSION = "FranchukOS Denali, version 29.0.7061.11 (x64) 2025-05-11"
