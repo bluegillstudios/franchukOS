@@ -5,7 +5,7 @@ import argparse
 import sys
 import os
 import shutil
-from service import backup, update, network
+from Service import backup, update, network
 update_manager = update
 backup_manager = backup
 VERSION_FILE = "../rainier/VERSION"
