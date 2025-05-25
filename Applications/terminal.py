@@ -42,6 +42,7 @@ class Terminal(tk.Toplevel):
 
         self.commands = {
             "list": self.list_files,
+            "dir": self.list_files,
             "clear": self.clear_terminal,
             "exit": self.quit_terminal,
             "pwd": self.print_working_directory,
@@ -66,11 +67,8 @@ class Terminal(tk.Toplevel):
             "arch": self.show_architecture,
             "python": self.run_python_interpreter,
             "help": self.show_help,
-<<<<<<< Updated upstream
-            "version": lambda args: "FranchukOS version 30.0.2291.121 (codenamed Rainier). Terminal version v0.7.0",
-=======
-            "version": lambda args: "FranchukOS version 30.1.6129.171 (codenamed Rainier). Terminal version v0.7.1",
->>>>>>> Stashed changes
+            "version": lambda args: "FranchukOS version 30.1.6129.171 (codenamed Rainier). Terminal version v0.7.4",
+            "rename": self.rename_file,
         }
 
     def handle_enter(self, event):
@@ -160,3 +158,23 @@ class Terminal(tk.Toplevel):
     def show_current_user(self, args): return getpass.getuser()
     def show_hostname(self, args): return platform.node()
     def show_ip_address(self, args): return os.popen('hostname -I').read()
+    def show_architecture(self, args): return platform.architecture()[0]
+    def run_python_interpreter(self, args):
+        self.text.insert("end", "\nEntering Python interpreter. Type 'exit()' to return to terminal.\n")
+        self.text.see("end")
+        sys.stdout = self.text
+        code.interact(local=self.interpreter.locals)
+        sys.stdout = io.StringIO()
+        self.text.insert("end", "Exited Python interpreter.\n" + self.PROMPT)
+        self.text.see("end")
+        return "break"
+    def show_help(self, args):
+        help_text = "Available commands:\n"
+        for cmd in self.commands:
+            help_text += f" - {cmd}\n"
+        return help_text
+    def rename_file(self, args):
+        if len(args) != 2:
+            return "Usage: rename <oldname> <newname>"
+        os.rename(args[0], args[1])
+        return f"Renamed '{args[0]}' to '{args[1]}'"
