@@ -249,3 +249,6 @@ class FileExplorer(tk.Toplevel):
             self.clipboard = None
         except Exception as e:
             messagebox.showerror("Error", f"Paste failed: {str(e)}")
+    def run(self):
+        self.mainloop()
+        

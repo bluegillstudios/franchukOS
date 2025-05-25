@@ -5,3 +5,4 @@ playsound
 PyQt5
 PyQtWebEngine
 matplotlib
+pyinstaller
