@@ -21,7 +21,7 @@ class FrannyBrowser(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Franny Browser (14.2.4298.121)")
+        self.setWindowTitle("Franny Browser (14.3.5671.224)")
         self.setGeometry(100, 100, 1024, 768)
 
         self.tabs = QTabWidget(self)
