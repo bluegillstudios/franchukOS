@@ -33,6 +33,7 @@ class FrannyBrowser(QMainWindow):
 
         self.history = self.load_history()
         self.zoom_level = 1.0
+        self.closed_tabs = []  # Stack for closed tabs
 
         self.init_toolbar()
         self.init_menu()
@@ -80,6 +81,11 @@ class FrannyBrowser(QMainWindow):
         new_tab_action.triggered.connect(self.new_tab)
         file_menu.addAction(new_tab_action)
 
+        restore_tab_action = QAction("Restore Closed Tab", self)
+        restore_tab_action.setShortcut("Ctrl+Shift+T")
+        restore_tab_action.triggered.connect(self.restore_closed_tab)
+        file_menu.addAction(restore_tab_action)
+
         incognito_action = QAction("Incognito Mode", self)
         incognito_action.triggered.connect(self.toggle_incognito)
         file_menu.addAction(incognito_action)
@@ -125,9 +131,20 @@ class FrannyBrowser(QMainWindow):
 
     def close_tab(self, index):
         if self.tabs.count() > 1:
+            browser = self.tabs.widget(index)
+            url = browser.url()
+            title = browser.title()
+            self.closed_tabs.append((url, title))
             self.tabs.removeTab(index)
         else:
             self.close()
+
+    def restore_closed_tab(self):
+        if self.closed_tabs:
+            url, title = self.closed_tabs.pop()
+            self.add_new_tab(url, title)
+        else:
+            self.status_bar.showMessage("No closed tabs to restore.")
 
     def current_browser(self):
         return self.tabs.currentWidget()
@@ -139,7 +156,16 @@ class FrannyBrowser(QMainWindow):
     def update_address_bar(self, index):
         browser = self.tabs.widget(index)
         if browser:
-            self.address_bar.setText(browser.url().toString())
+            url = browser.url().toString()
+            self.address_bar.setText(url)
+            if url.startswith("https://"):
+                self.status_bar.showMessage("Secure connection (HTTPS)")
+            elif url.startswith("http://"):
+                self.status_bar.showMessage("Not secure (HTTP)")
+            elif url.startswith("ssh://"):
+                self.status_bar.showMessage("SSH protocol detected")
+            else:
+                self.status_bar.clearMessage()
 
     def navigate_to_url(self):
         url = QUrl(self.address_bar.text())
@@ -168,6 +194,14 @@ class FrannyBrowser(QMainWindow):
         layout = QVBoxLayout()
         for bookmark in bookmarks:
             button = QPushButton(bookmark, self)
+            favicon = QIcon()
+            try:
+                browser = BrowserTab()
+                browser.setUrl(QUrl(bookmark))
+                favicon = browser.icon()
+            except Exception:
+                pass
+            button.setIcon(favicon)
             button.clicked.connect(lambda _, url=bookmark: self.add_new_tab(QUrl(url), url))
             layout.addWidget(button)
         bookmark_dialog.setLayout(layout)
