@@ -158,23 +158,3 @@ class Terminal(tk.Toplevel):
     def show_current_user(self, args): return getpass.getuser()
     def show_hostname(self, args): return platform.node()
     def show_ip_address(self, args): return os.popen('hostname -I').read()
-    def show_architecture(self, args): return platform.architecture()[0]
-    def run_python_interpreter(self, args):
-        self.text.insert("end", "\nEntering Python interpreter. Type 'exit()' to return to terminal.\n")
-        self.text.see("end")
-        sys.stdout = self.text
-        code.interact(local=self.interpreter.locals)
-        sys.stdout = io.StringIO()
-        self.text.insert("end", "Exited Python interpreter.\n" + self.PROMPT)
-        self.text.see("end")
-        return "break"
-    def show_help(self, args):
-        help_text = "Available commands:\n"
-        for cmd in self.commands:
-            help_text += f" - {cmd}\n"
-        return help_text
-    def rename_file(self, args):
-        if len(args) != 2:
-            return "Usage: rename <oldname> <newname>"
-        os.rename(args[0], args[1])
-        return f"Renamed '{args[0]}' to '{args[1]}'"
