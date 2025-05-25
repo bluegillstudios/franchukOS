@@ -42,6 +42,7 @@ class Terminal(tk.Toplevel):
 
         self.commands = {
             "list": self.list_files,
+            "dir": self.list_files,
             "clear": self.clear_terminal,
             "exit": self.quit_terminal,
             "pwd": self.print_working_directory,
@@ -66,7 +67,8 @@ class Terminal(tk.Toplevel):
             "arch": self.show_architecture,
             "python": self.run_python_interpreter,
             "help": self.show_help,
-            "version": lambda args: "FranchukOS version 30.0.2291.121 (codenamed Rainier). Terminal version v0.7.0",
+            "version": lambda args: "FranchukOS version 31.1.1.6379.132 (codenamed Rainier). Terminal version v0.7.4",
+            "rename": self.rename_file,
         }
 
     def handle_enter(self, event):
