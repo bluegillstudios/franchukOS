@@ -24,39 +24,49 @@ class FileExplorer(tk.Toplevel):
         self.populate_directory(self.current_dir)
 
     def setup_ui(self):
-        # Sidebar Frame
-        sidebar = tk.Frame(self, bg="#121212", width=150)
-        sidebar.pack(side="left", fill="y")
+        # Toolbar
+        toolbar = tk.Frame(self, bg="#f0f0f0", height=30)
+        toolbar.pack(side="top", fill="x")
 
-        btn_style = {"bg": "#202020", "fg": "lime", "font": ("Courier", 10), "relief": "flat", "activebackground": "#303030"}
+        def add_toolbar_button(text, cmd):
+            btn = tk.Button(toolbar, text=text, command=cmd, bg="#f0f0f0", relief="flat", font=("Segoe UI", 9))
+            btn.pack(side="left", padx=5, pady=2)
 
-        tk.Button(sidebar, text="Up", command=self.go_up, **btn_style).pack(fill="x", pady=2)
-        tk.Button(sidebar, text="Refresh", command=self.refresh, **btn_style).pack(fill="x", pady=2)
-        tk.Button(sidebar, text="New File", command=self.create_new_file, **btn_style).pack(fill="x", pady=2)
-        tk.Button(sidebar, text="New Folder", command=self.create_new_folder, **btn_style).pack(fill="x", pady=2)
-        tk.Button(sidebar, text="Delete", command=self.delete_item, **btn_style).pack(fill="x", pady=2)
-        tk.Button(sidebar, text="Rename", command=self.rename_item, **btn_style).pack(fill="x", pady=2)
-        tk.Button(sidebar, text="Paste", command=self.paste_item, **btn_style).pack(fill="x", pady=2)
+        add_toolbar_button("Up", self.go_up)
+        add_toolbar_button("Refresh", self.refresh)
+        add_toolbar_button("File", self.create_new_file)
+        add_toolbar_button("Folder", self.create_new_folder)
+        add_toolbar_button("Rename", self.rename_item)
+        add_toolbar_button("Delete", self.delete_item)
+        add_toolbar_button("Paste", self.paste_item)
 
-        # Main Frame
-        main_frame = tk.Frame(self, bg="#101010")
-        main_frame.pack(fill="both", expand=True)
+        # Path and Search Bar
+        path_frame = tk.Frame(self, bg="#ffffff")
+        path_frame.pack(fill="x", padx=10, pady=2)
 
-        self.path_label = tk.Label(main_frame, text=self.current_dir, bg="#101010", fg="lime", font=("Courier", 12))
-        self.path_label.pack(fill="x", padx=10, pady=5)
+        self.path_label = tk.Label(path_frame, text=self.current_dir, anchor="w", font=("Segoe UI", 10), bg="white")
+        self.path_label.pack(side="left", fill="x", expand=True)
 
-        self.search_entry = tk.Entry(main_frame, bg="black", fg="lime", insertbackground="lime", font=("Courier", 10))
-        self.search_entry.pack(fill="x", padx=10, pady=2)
+        self.search_entry = tk.Entry(path_frame, font=("Segoe UI", 10))
+        self.search_entry.pack(side="right")
         self.search_entry.bind("<KeyRelease>", self.search_files)
 
-        # File List
-        self.listbox = tk.Listbox(main_frame, bg="black", fg="lime", font=("Courier", 10), selectmode=tk.SINGLE)
-        self.listbox.pack(fill="both", expand=True, padx=10, pady=10)
-        self.listbox.bind("<Double-1>", self.on_item_double_click)
-        self.listbox.bind("<Button-3>", self.show_context_menu)
+        # File Table View
+        self.tree = ttk.Treeview(self, columns=("Name", "Size", "Modified"), show="headings")
+        self.tree.heading("Name", text="Name")
+        self.tree.heading("Size", text="Size")
+        self.tree.heading("Modified", text="Date Modified")
+        self.tree.column("Name", anchor="w", width=300)
+        self.tree.column("Size", anchor="e", width=100)
+        self.tree.column("Modified", anchor="center", width=150)
+        self.tree.pack(fill="both", expand=True, padx=10, pady=5)
 
-        # Context Menu
-        self.context_menu = tk.Menu(self, tearoff=0, bg="black", fg="lime")
+        # Bind double-click
+        self.tree.bind("<Double-1>", self.on_item_double_click)
+        self.tree.bind("<Button-3>", self.show_context_menu)
+
+        # Context menu
+        self.context_menu = tk.Menu(self, tearoff=0)
         self.context_menu.add_command(label="Open", command=self.context_open)
         self.context_menu.add_command(label="Rename", command=self.rename_item)
         self.context_menu.add_command(label="Delete", command=self.delete_item)
@@ -64,18 +74,17 @@ class FileExplorer(tk.Toplevel):
         self.context_menu.add_command(label="Cut", command=self.cut_item)
 
     def populate_directory(self, path):
-        self.listbox.delete(0, tk.END)
+        self.tree.delete(*self.tree.get_children())
         self.path_label.config(text=path)
         try:
             for item in sorted(os.listdir(path)):
                 item_path = os.path.join(path, item)
                 if os.path.isdir(item_path):
-                    display_name = f"[DIR] {item}"
+                    size = "---"
                 else:
-                    size = os.path.getsize(item_path)
-                    modified = datetime.fromtimestamp(os.path.getmtime(item_path)).strftime("%Y-%m-%d %H:%M")
-                    display_name = f"{item} ({size} B, {modified})"
-                self.listbox.insert(tk.END, display_name)
+                    size = f"{os.path.getsize(item_path)} B"
+                modified = datetime.fromtimestamp(os.path.getmtime(item_path)).strftime("%Y-%m-%d %H:%M")
+                self.tree.insert("", "end", values=(item, size, modified))
         except Exception as e:
             messagebox.showerror("Error", f"Could not list directory: {str(e)}")
 
@@ -91,11 +100,10 @@ class FileExplorer(tk.Toplevel):
             self.open_file(selected)
 
     def get_selected_item(self):
-        try:
-            item = self.listbox.get(self.listbox.curselection()).strip()
-            return item[6:] if item.startswith("[DIR] ") else item.split(" (")[0]
-        except:
-            return None
+        selected = self.tree.focus()
+        if selected:
+            return self.tree.item(selected, 'values')[0]
+        return None
 
     def open_file(self, name):
         path = os.path.join(self.current_dir, name)
