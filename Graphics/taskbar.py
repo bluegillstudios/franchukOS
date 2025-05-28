@@ -115,39 +115,77 @@ class AppWindow(tk.Toplevel):
 class Taskbar(tk.Frame):
     def __init__(self, parent):
         super().__init__(parent)
-        # self.title("Taskbar")
-        # self.geometry("800x50")  
-        self.configure(bg="black")
+        self.configure(bg="#1e1e1e")  # Dark theme background
 
         self.window_manager = WindowManager(self)
 
-        self.taskbar_frame = tk.Frame(self, bg="black", height=50)
+        # Bottom bar
+        self.taskbar_frame = tk.Frame(self, bg="#1e1e1e", height=50)
         self.taskbar_frame.pack(fill="x", side="bottom")
 
-        self.start_button = tk.Button(self.taskbar_frame, text="Start", command=self.show_start_menu, bg="black", fg="lime", font=("Courier", 12))
-        self.start_button.pack(side="left", padx=5)
+        # Start Button
+        self.start_button = tk.Button(
+            self.taskbar_frame, text="🟢 Start",
+            command=self.show_start_menu,
+            bg="#333333", fg="white",
+            font=("Segoe UI", 11, "bold"),
+            activebackground="#444444",
+            relief="flat", bd=0,
+            padx=10, pady=5
+        )
+        self.start_button.pack(side="left", padx=8, pady=5)
 
-        self.clock_label = tk.Label(self.taskbar_frame, text=self.get_time(), bg="black", fg="lime", font=("Courier", 12))
-        self.clock_label.pack(side="right", padx=10)
+        # Clock
+        self.clock_label = tk.Label(
+            self.taskbar_frame,
+            text=self.get_time(),
+            bg="#1e1e1e", fg="white",
+            font=("Segoe UI", 11)
+        )
+        self.clock_label.pack(side="right", padx=12)
 
+        # System tray placeholder
+        self.system_tray = tk.Frame(self.taskbar_frame, bg="#1e1e1e")
+        self.system_tray.pack(side="right", padx=8)
+
+        # Open window buttons
+        self.taskbar_buttons_frame = tk.Frame(self, bg="#1e1e1e")
+        self.taskbar_buttons_frame.pack(side="bottom", fill="x")
+
+        # Start updating time
         self.update_time_thread = Thread(target=self.update_time, daemon=True)
         self.update_time_thread.start()
 
-        self.system_tray = tk.Frame(self.taskbar_frame, bg="black")
-        self.system_tray.pack(side="right", padx=10)
+    def add_taskbar_button(self, window_name):
+        button = tk.Button(
+            self.taskbar_buttons_frame, text=window_name,
+            command=lambda: self.window_manager.switch_to_window(window_name),
+            bg="#2d2d2d", fg="white",
+            activebackground="#444444",
+            font=("Segoe UI", 10),
+            relief="flat", bd=0,
+            padx=8, pady=4
+        )
+        button.bind("<Enter>", lambda e: button.config(bg="#3a3a3a"))
+        button.bind("<Leave>", lambda e: button.config(bg="#2d2d2d"))
+        button.bind("<Button-3>", lambda event, name=window_name: self.show_taskbar_context_menu(event, name))
+        button.pack(side="left", padx=5, pady=5)
 
-        self.taskbar_buttons_frame = tk.Frame(self, bg="black")
-        self.taskbar_buttons_frame.pack(side="bottom", fill="x")
+    def update_taskbar_button(self, window_name):
+        for button in self.taskbar_buttons_frame.winfo_children():
+            if button['text'] == window_name:
+                button.configure(bg="#555555")
+            else:
+                button.configure(bg="#2d2d2d")
 
     def get_time(self):
         return datetime.now().strftime("%H:%M:%S")
-
+    
     def update_time(self):
         self.clock_label.configure(text=self.get_time())
         self.after(1000, self.update_time)  
-        
     def show_start_menu(self):
-        menu = tk.Menu(self, tearoff=0, bg="black", fg="lime")
+        menu = tk.Menu(self, tearoff=0, bg="#1e1e1e", fg="white", activebackground="#444444", font=("Segoe UI", 10))
         menu.add_command(label="File Explorer", command=self.launch_file_explorer)
         menu.add_command(label="Terminal", command=self.launch_terminal)
         menu.add_command(label="Insider", command=self.launch_insider)
@@ -166,7 +204,9 @@ class Taskbar(tk.Frame):
         menu.add_separator()
         menu.add_command(label="Exit", command=self.exit_os)
 
-        menu.post(self.winfo_rootx() + self.start_button.winfo_x(), self.winfo_rooty() + self.start_button.winfo_y() + 50)
+        menu.post(
+            self.winfo_rootx() + self.start_button.winfo_x(),
+            self.winfo_rooty() + self.start_button.winfo_y() + 50 )
 
     def exit_os(self):
         confirm = messagebox.askyesno("Exit", "Are you sure you want to exit FranchukOS?")
@@ -218,7 +258,7 @@ class Taskbar(tk.Frame):
         try:
             subprocess.Popen([sys.executable, "Applications/franny.py"])
         except Exception as e:
-            print(f"Failed to launch Franny v14.2.4298.121: {e}")
+            print(f"Failed to launch Franny v14.5.6078.275: {e}")
     def launch_snake(self):
         self.window_manager.open_window("Snake", SnakeGame)
     def launch_space_invaders(self):
@@ -229,14 +269,14 @@ class Taskbar(tk.Frame):
         try:
             subprocess.Popen([sys.executable, "Applications/franpaint.py"])
         except Exception as e:
-            print(f"Failed to launch Franpaint v1.10: {e}")
+            print(f"Failed to launch Franpaint v1.77: {e}")
     def launch_taskmgr(self):
         self.window_manager.open_window("Task Manager", TaskManager)
     def launch_birdseye(self):
         try:
             subprocess.Popen([sys.executable, "Applications/birdseye.py"])
         except Exception as e:
-            print(f"Failed to launch Birdseye v1.32: {e}")
+            print(f"Failed to launch Birdseye v2.20.8: {e}")
     
     
 
