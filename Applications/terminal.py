@@ -34,6 +34,7 @@ class Terminal(tk.Toplevel):
         self.text.bind("<Return>", self.handle_enter)
         self.text.bind("<Up>", self.history_up)
         self.text.bind("<Down>", self.history_down)
+        self.text.focus_set()
 
         self.cmd_buffer = ""
         self.cmd_history = []
@@ -67,19 +68,22 @@ class Terminal(tk.Toplevel):
             "arch": self.show_architecture,
             "python": self.run_python_interpreter,
             "help": self.show_help,
-            "version": lambda args: "FranchukOS version 31.1.1.6379.132 (codenamed Rainier). Terminal version v0.7.4",
+            "version": lambda args: "FranchukOS version 30.1.1.7977.191 (codenamed Rainier). Terminal version v0.7.4.2",
             "rename": self.rename_file,
         }
 
-    def handle_enter(self, event):
+    def handle_enter(self, event=None):
+        # Get the current line (from the prompt onwards)
         index = self.text.index("insert linestart")
-        line = self.text.get(index, "insert lineend").strip()
+        line = self.text.get(index, "insert lineend")
+        # Only the part after the prompt
         if line.startswith(self.PROMPT):
             code_line = line[len(self.PROMPT):].strip()
         else:
             code_line = line.strip()
         self.text.insert("end", "\n")
-        self.cmd_history.append(code_line)
+        if code_line:
+            self.cmd_history.append(code_line)
         self.history_index = len(self.cmd_history)
         output = self.run_code(code_line)
         if output:
@@ -88,13 +92,13 @@ class Terminal(tk.Toplevel):
         self.text.see("end")
         return "break"
 
-    def history_up(self, event):
+    def history_up(self, event=None):
         if self.cmd_history and self.history_index > 0:
             self.history_index -= 1
             self.replace_current_line(self.cmd_history[self.history_index])
         return "break"
 
-    def history_down(self, event):
+    def history_down(self, event=None):
         if self.cmd_history and self.history_index < len(self.cmd_history) - 1:
             self.history_index += 1
             self.replace_current_line(self.cmd_history[self.history_index])
@@ -103,8 +107,11 @@ class Terminal(tk.Toplevel):
         return "break"
 
     def replace_current_line(self, text):
-        self.text.delete("insert linestart + {}c".format(len(self.PROMPT)), "insert lineend")
-        self.text.insert("insert", text)
+        # Delete everything after the prompt on the current line, then insert
+        line_start = self.text.index("insert linestart")
+        prompt_len = len(self.PROMPT)
+        self.text.delete(f"{line_start}+{prompt_len}c", f"{line_start} lineend")
+        self.text.insert(f"{line_start}+{prompt_len}c", text)
 
     def run_code(self, code_line):
         if not code_line:
@@ -114,10 +121,12 @@ class Terminal(tk.Toplevel):
 
         if cmd in self.commands:
             try:
-                return self.commands[cmd](args)
+                result = self.commands[cmd](args)
+                return result if result is not None else ""
             except Exception as e:
                 return f"Error: {str(e)}"
         else:
+            # Fallback: try to execute as python code
             stdout = sys.stdout
             sys.stdout = buffer = io.StringIO()
             try:
@@ -127,34 +136,165 @@ class Terminal(tk.Toplevel):
             sys.stdout = stdout
             return buffer.getvalue()
 
-    def list_files(self, args): return "\n".join(os.listdir(os.getcwd()))
-    def clear_terminal(self, args): self.text.delete(1.0, "end"); return "Welcome to FranchukOS Terminal v0.7"
-    def quit_terminal(self, args): self.destroy(); return ""
-    def print_working_directory(self, args): return os.getcwd()
-    def change_directory(self, args): os.chdir(args[0]); return f"Changed to {os.getcwd()}"
-    def make_directory(self, args): os.makedirs(args[0]); return f"Directory '{args[0]}' created."
-    def remove_directory(self, args): os.rmdir(args[0]); return f"Directory '{args[0]}' removed."
-    def remove_file(self, args): os.remove(args[0]); return f"File '{args[0]}' removed."
-    def copy_file(self, args): shutil.copy(args[0], args[1]); return f"Copied {args[0]} to {args[1]}"
-    def move_file(self, args): shutil.move(args[0], args[1]); return f"Moved {args[0]} to {args[1]}"
-    def cat_file(self, args): return open(args[0]).read()
-    def echo_text(self, args): return " ".join(args)
-    def show_time(self, args): return time.strftime("%H:%M:%S")
-    def show_date(self, args): return time.strftime("%Y-%m-%d")
+    def list_files(self, args):
+        try:
+            path = args[0] if args else os.getcwd()
+            files = os.listdir(path)
+            return "\n".join(files)
+        except Exception as e:
+            return f"Error: {str(e)}"
+
+    def clear_terminal(self, args):
+        self.text.delete(1.0, "end")
+        return "Welcome to the Terminal, v0.7"
+
+    def quit_terminal(self, args):
+        self.destroy()
+        return ""
+
+    def print_working_directory(self, args):
+        return os.getcwd()
+
+    def change_directory(self, args):
+        if not args:
+            return "Error: No directory specified"
+        try:
+            os.chdir(args[0])
+            return f"Changed to {os.getcwd()}"
+        except Exception as e:
+            return f"Error: {str(e)}"
+
+    def make_directory(self, args):
+        if not args:
+            return "Error: No directory name specified"
+        try:
+            os.makedirs(args[0])
+            return f"Directory '{args[0]}' created."
+        except Exception as e:
+            return f"Error: {str(e)}"
+
+    def remove_directory(self, args):
+        if not args:
+            return "Error: No directory name specified"
+        try:
+            os.rmdir(args[0])
+            return f"Directory '{args[0]}' removed."
+        except Exception as e:
+            return f"Error: {str(e)}"
+
+    def remove_file(self, args):
+        if not args:
+            return "Error: No file specified"
+        try:
+            os.remove(args[0])
+            return f"File '{args[0]}' removed."
+        except Exception as e:
+            return f"Error: {str(e)}"
+
+    def copy_file(self, args):
+        if len(args) < 2:
+            return "Error: Source and destination required"
+        try:
+            shutil.copy(args[0], args[1])
+            return f"Copied {args[0]} to {args[1]}"
+        except Exception as e:
+            return f"Error: {str(e)}"
+
+    def move_file(self, args):
+        if len(args) < 2:
+            return "Error: Source and destination required"
+        try:
+            shutil.move(args[0], args[1])
+            return f"Moved {args[0]} to {args[1]}"
+        except Exception as e:
+            return f"Error: {str(e)}"
+
+    def cat_file(self, args):
+        if not args:
+            return "Error: No file specified"
+        try:
+            with open(args[0], "r") as f:
+                return f.read()
+        except Exception as e:
+            return f"Error: {str(e)}"
+
+    def echo_text(self, args):
+        return " ".join(args)
+
+    def show_time(self, args):
+        return time.strftime("%H:%M:%S")
+
+    def show_date(self, args):
+        return time.strftime("%Y-%m-%d")
+
     def show_disk_space(self, args):
-        t, u, f = shutil.disk_usage("/")
-        return f"Total: {t//(2**30)} GB, Used: {u//(2**30)} GB, Free: {f//(2**30)} GB"
+        try:
+            path = args[0] if args else "/"
+            t, u, f = shutil.disk_usage(path)
+            return f"Total: {t//(2**30)} GB, Used: {u//(2**30)} GB, Free: {f//(2**30)} GB"
+        except Exception as e:
+            return f"Error: {str(e)}"
+
     def show_memory_info(self, args):
-        m = psutil.virtual_memory()
-        return f"Total: {m.total//(2**30)} GB, Available: {m.available//(2**30)} GB, Used: {m.used//(2**30)} GB"
+        try:
+            m = psutil.virtual_memory()
+            return f"Total: {m.total//(2**30)} GB, Available: {m.available//(2**30)} GB, Used: {m.used//(2**30)} GB"
+        except Exception as e:
+            return f"Error: {str(e)}"
+
     def show_uptime(self, args):
-        return str(datetime.timedelta(seconds=int(time.time() - psutil.boot_time())))
+        try:
+            return str(datetime.timedelta(seconds=int(time.time() - psutil.boot_time())))
+        except Exception as e:
+            return f"Error: {str(e)}"
+
     def show_processes(self, args):
-        return "\n".join(f"{p.info['pid']} - {p.info['name']}" for p in psutil.process_iter(['pid', 'name']))
+        try:
+            return "\n".join(f"{p.info['pid']} - {p.info['name']}" for p in psutil.process_iter(['pid', 'name']))
+        except Exception as e:
+            return f"Error: {str(e)}"
+
     def kill_process(self, args):
-        pid = int(args[0])
-        psutil.Process(pid).terminate()
-        return f"Terminated process {pid}"
-    def show_current_user(self, args): return getpass.getuser()
-    def show_hostname(self, args): return platform.node()
-    def show_ip_address(self, args): return os.popen('hostname -I').read()
+        if not args:
+            return "Error: No PID specified"
+        try:
+            pid = int(args[0])
+            psutil.Process(pid).terminate()
+            return f"Terminated process {pid}"
+        except Exception as e:
+            return f"Error: {str(e)}"
+
+    def show_current_user(self, args):
+        return getpass.getuser()
+
+    def show_hostname(self, args):
+        return platform.node()
+
+    def show_ip_address(self, args):
+        try:
+            # Cross-platform: fallback to socket if popen fails
+            ip = os.popen('hostname -I').read().strip()
+            if not ip:
+                import socket
+                ip = socket.gethostbyname(socket.gethostname())
+            return ip
+        except Exception as e:
+            return f"Error: {str(e)}"
+
+    def show_architecture(self, args):
+        return platform.machine()
+
+    def run_python_interpreter(self, args):
+        return "Python interactive interpreter not supported in this shell. Please type Python code directly."
+
+    def show_help(self, args):
+        return "Supported commands:\n" + ", ".join(sorted(self.commands.keys()))
+
+    def rename_file(self, args):
+        if len(args) < 2:
+            return "Error: Source and new name required"
+        try:
+            os.rename(args[0], args[1])
+            return f"Renamed {args[0]} to {args[1]}"
+        except Exception as e:
+            return f"Error: {str(e)}"
