@@ -3,9 +3,10 @@
 
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QToolBar, QAction, QColorDialog,
-    QFileDialog, QLabel, QComboBox, QMessageBox, QInputDialog, QMenu, QClipboard
+    QFileDialog, QLabel, QComboBox, QMessageBox, QInputDialog, QMenu, 
+    QSizePolicy
 )
-from PyQt5.QtGui import QPainter, QPixmap, QPen, QColor, QMouseEvent, QFont, QImage, QTransform
+from PyQt5.QtGui import QPainter, QPixmap, QPen, QColor, QMouseEvent, QFont, QImage, QTransform, QClipboard
 from PyQt5.QtCore import Qt, QPoint, QRect
 from PyQt5.QtSvg import QSvgGenerator
 from PyQt5.QtPrintSupport import QPrinter
@@ -15,10 +16,12 @@ import sys
 class Franpaint(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Franpaint v3.2.7")
+        self.setWindowTitle("Franpaint v3.2.9")
         self.setGeometry(100, 100, 800, 600)
 
         self.canvas = QLabel()
+        self.canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.canvas.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         self.pixmap = QPixmap(800, 600)
         self.pixmap.fill(Qt.white)
         self.canvas.setPixmap(self.pixmap)
@@ -37,7 +40,58 @@ class Franpaint(QMainWindow):
         self.fill_shapes = False  # For fill option
         self.current_fill_color = Qt.white  # Default fill color
 
+        self.init_menu()
         self.init_toolbar()
+
+    def init_menu(self):
+        menubar = self.menuBar()
+
+        # File Menu
+        file_menu = menubar.addMenu("File")
+        file_menu.addAction("New", self.clear_canvas)
+        file_menu.addAction("Open...", self.load_image)
+        file_menu.addAction("Save...", self.save_image)
+        file_menu.addSeparator()
+        file_menu.addAction("Export as PDF...", self.export_pdf)
+        file_menu.addAction("Export as SVG...", self.export_svg)
+        file_menu.addAction("Copy to Clipboard", self.copy_to_clipboard)
+        file_menu.addSeparator()
+        file_menu.addAction("Exit", self.close)
+
+        # Edit Menu
+        edit_menu = menubar.addMenu("Edit")
+        edit_menu.addAction("Undo", self.undo)
+        edit_menu.addAction("Redo", self.redo)
+        edit_menu.addSeparator()
+        edit_menu.addAction("Crop", self.crop_image)
+        edit_menu.addAction("Resize", self.resize_image)
+        edit_menu.addAction("Rotate", self.rotate_image)
+
+        # Tools Menu
+        tools_menu = menubar.addMenu("Tools")
+        tools_menu.addAction("Freehand", lambda: self.set_tool('freehand'))
+        tools_menu.addAction("Rectangle", lambda: self.set_tool('rectangle'))
+        tools_menu.addAction("Ellipse", lambda: self.set_tool('ellipse'))
+        tools_menu.addAction("Text", self.insert_text)
+        tools_menu.addSeparator()
+        tools_menu.addAction("Eyedropper", lambda: self.set_tool('eyedropper'))
+        tools_menu.addSeparator()
+        fill_shapes_action = QAction("Fill Shapes", self, checkable=True)
+        fill_shapes_action.setChecked(self.fill_shapes)
+        fill_shapes_action.toggled.connect(self.toggle_fill)
+        tools_menu.addAction(fill_shapes_action)
+        tools_menu.addAction("Fill Color...", self.select_fill_color)
+        tools_menu.addAction("Pen Color...", self.select_color)
+
+        # Help Menu
+        help_menu = menubar.addMenu("Help")
+        help_menu.addAction("About", self.show_about)
+
+    def clear_canvas(self):
+        self.undo_stack.append(self.pixmap.copy())
+        self.redo_stack.clear()
+        self.pixmap.fill(Qt.white)
+        self.canvas.setPixmap(self.pixmap)
 
     def init_toolbar(self):
         toolbar = QToolBar("Tools")
@@ -125,37 +179,57 @@ class Franpaint(QMainWindow):
         about_action.triggered.connect(self.show_about)
         toolbar.addAction(about_action)
 
+    def resizeEvent(self, event):
+        # Resize the pixmap to fit the new window size, preserving content
+        new_size = self.canvas.size()
+        if new_size.width() > 0 and new_size.height() > 0:
+            new_pixmap = QPixmap(new_size)
+            new_pixmap.fill(Qt.white)
+            painter = QPainter(new_pixmap)
+            painter.drawPixmap(0, 0, self.pixmap)
+            painter.end()
+            self.pixmap = new_pixmap
+            self.canvas.setPixmap(self.pixmap)
+        super().resizeEvent(event)
+
+    def _canvas_pos(self, event):
+        # Map global event position to canvas coordinates
+        return self.canvas.mapFromParent(event.pos())
+
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.LeftButton:
             self.undo_stack.append(self.pixmap.copy())
             self.redo_stack.clear()
             self.drawing = True
-            self.last_point = event.pos()
-            self.current_point = event.pos()
+            pos = self._canvas_pos(event)
+            self.last_point = pos
+            self.current_point = pos
 
     def mouseMoveEvent(self, event: QMouseEvent):
         if self.drawing and self.current_tool == 'freehand':
+            pos = self._canvas_pos(event)
             painter = QPainter(self.pixmap)
             pen = QPen(self.pen_color, self.pen_width, self.pen_style)
             painter.setPen(pen)
-            painter.drawLine(self.last_point, event.pos())
-            self.last_point = event.pos()
+            painter.drawLine(self.last_point, pos)
+            self.last_point = pos
             self.canvas.setPixmap(self.pixmap)
 
     def mouseReleaseEvent(self, event: QMouseEvent):
         if event.button() == Qt.LeftButton and self.drawing:
             self.drawing = False
+            pos = self._canvas_pos(event)
             painter = QPainter(self.pixmap)
             pen = QPen(self.pen_color, self.pen_width, self.pen_style)
             painter.setPen(pen)
 
             if self.current_tool == 'rectangle':
-                rect = QRect(self.last_point, event.pos())
+                rect = QRect(self.last_point, pos)
                 if self.fill_shapes:
                     painter.fillRect(rect, self.current_fill_color)
                 painter.drawRect(rect)
             elif self.current_tool == 'ellipse':
-                rect = QRect(self.last_point, event.pos())
+                rect = QRect(self.last_point, pos)
                 if self.fill_shapes:
                     painter.setBrush(self.current_fill_color)
                 else:
@@ -163,7 +237,7 @@ class Franpaint(QMainWindow):
                 painter.drawEllipse(rect)
             elif self.current_tool == 'eyedropper':
                 img = self.pixmap.toImage()
-                color = QColor(img.pixel(event.pos()))
+                color = QColor(img.pixel(pos))
                 self.pen_color = color
 
             self.canvas.setPixmap(self.pixmap)
@@ -289,7 +363,7 @@ class Franpaint(QMainWindow):
             self.canvas.setPixmap(self.pixmap)
 
     def show_about(self):
-        QMessageBox.about(self, "About Franpaint", "Franpaint v3.2.7\nA simple paint program for FranchukOS.\n Copyright (c) 2025 the FranchukOS Project Authors and Bluegill Studios.")
+        QMessageBox.about(self, "About Franpaint", "Franpaint v3.2.9\nA simple paint program for FranchukOS.\n Copyright (c) 2025 the FranchukOS Project Authors and Bluegill Studios.")
 
 
 if __name__ == "__main__":
