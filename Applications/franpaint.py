@@ -121,7 +121,7 @@ class Franpaint(QMainWindow):
         text_action = QAction("Text", self)
         text_action.triggered.connect(self.insert_text)
         toolbar.addAction(text_action)
-        
+
     def resizeEvent(self, event):
         # Resize the pixmap to fit the new window size, preserving content
         new_size = self.canvas.size()
@@ -306,7 +306,7 @@ class Franpaint(QMainWindow):
             self.canvas.setPixmap(self.pixmap)
 
     def show_about(self):
-        QMessageBox.about(self, "About Franpaint", "Franpaint v3.2.9\nA simple paint program for FranchukOS.\n Copyright (c) 2025 the FranchukOS Project Authors and Bluegill Studios.")
+        QMessageBox.about(self, "About Franpaint", "Franpaint v3.2.9\nA simple paint program for FranchukOS.\n Copyright (c) 2025 the FranchukOS Project Authors.")
 
 
 if __name__ == "__main__":
