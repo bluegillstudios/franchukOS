@@ -121,64 +121,7 @@ class Franpaint(QMainWindow):
         text_action = QAction("Text", self)
         text_action.triggered.connect(self.insert_text)
         toolbar.addAction(text_action)
-
-        save_action = QAction("Save", self)
-        save_action.triggered.connect(self.save_image)
-        toolbar.addAction(save_action)
-
-        load_action = QAction("Load", self)
-        load_action.triggered.connect(self.load_image)
-        toolbar.addAction(load_action)
-
-        undo_action = QAction("Undo", self)
-        undo_action.triggered.connect(self.undo)
-        toolbar.addAction(undo_action)
-
-        redo_action = QAction("Redo", self)
-        redo_action.triggered.connect(self.redo)
-        toolbar.addAction(redo_action)
-
-        fill_action = QAction("Fill Shapes", self)
-        fill_action.setCheckable(True)
-        fill_action.toggled.connect(self.toggle_fill)
-        toolbar.addAction(fill_action)
-
-        fill_color_action = QAction("Fill Color", self)
-        fill_color_action.triggered.connect(self.select_fill_color)
-        toolbar.addAction(fill_color_action)
-
-        export_pdf_action = QAction("Export PDF", self)
-        export_pdf_action.triggered.connect(self.export_pdf)
-        toolbar.addAction(export_pdf_action)
-
-        export_svg_action = QAction("Export SVG", self)
-        export_svg_action.triggered.connect(self.export_svg)
-        toolbar.addAction(export_svg_action)
-
-        copy_clipboard_action = QAction("Copy to Clipboard", self)
-        copy_clipboard_action.triggered.connect(self.copy_to_clipboard)
-        toolbar.addAction(copy_clipboard_action)
-
-        crop_action = QAction("Crop", self)
-        crop_action.triggered.connect(self.crop_image)
-        toolbar.addAction(crop_action)
-
-        resize_action = QAction("Resize", self)
-        resize_action.triggered.connect(self.resize_image)
-        toolbar.addAction(resize_action)
-
-        rotate_action = QAction("Rotate", self)
-        rotate_action.triggered.connect(self.rotate_image)
-        toolbar.addAction(rotate_action)
-
-        eyedropper_action = QAction("Eyedropper", self)
-        eyedropper_action.triggered.connect(lambda: self.set_tool('eyedropper'))
-        toolbar.addAction(eyedropper_action)
-
-        about_action = QAction("About", self)
-        about_action.triggered.connect(self.show_about)
-        toolbar.addAction(about_action)
-
+        
     def resizeEvent(self, event):
         # Resize the pixmap to fit the new window size, preserving content
         new_size = self.canvas.size()
