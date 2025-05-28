@@ -68,7 +68,7 @@ class Terminal(tk.Toplevel):
             "arch": self.show_architecture,
             "python": self.run_python_interpreter,
             "help": self.show_help,
-            "version": lambda args: "FranchukOS version 30.1.1.6379.132 (codenamed Rainier). Terminal version v0.7.4.2",
+            "version": lambda args: "FranchukOS version 30.1.1.7977.191 (codenamed Rainier). Terminal version v0.7.4.2",
             "rename": self.rename_file,
         }
 
