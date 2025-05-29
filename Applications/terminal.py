@@ -146,7 +146,7 @@ class Terminal(tk.Toplevel):
 
     def clear_terminal(self, args):
         self.text.delete(1.0, "end")
-
+        
     def quit_terminal(self, args):
         self.destroy()
         return ""
