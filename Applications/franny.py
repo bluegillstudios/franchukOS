@@ -5,6 +5,7 @@ import sys
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtWebEngineWidgets import *
+from PyQt5.QtWebEngineWidgets import QWebEngineDownloadItem
 from PyQt5.QtGui import QIcon
 import json
 import os
@@ -21,7 +22,7 @@ class FrannyBrowser(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Franny Browser (14.3.5671.224)")
+        self.setWindowTitle("Franny Browser (14.5.6078.275)")
         self.setGeometry(100, 100, 1024, 768)
 
         self.tabs = QTabWidget(self)
@@ -94,6 +95,14 @@ class FrannyBrowser(QMainWindow):
         add_bookmark_action.triggered.connect(self.add_bookmark)
         file_menu.addAction(add_bookmark_action)
 
+        import_bookmarks_action = QAction("Import Bookmarks", self)
+        import_bookmarks_action.triggered.connect(self.import_bookmarks)
+        file_menu.addAction(import_bookmarks_action)
+
+        export_bookmarks_action = QAction("Export Bookmarks", self)
+        export_bookmarks_action.triggered.connect(self.export_bookmarks)
+        file_menu.addAction(export_bookmarks_action)
+
         clear_data_action = QAction("Clear Data", self)
         clear_data_action.triggered.connect(self.clear_data)
         file_menu.addAction(clear_data_action)
@@ -110,6 +119,10 @@ class FrannyBrowser(QMainWindow):
         find_in_page_action.triggered.connect(self.find_in_page)
         file_menu.addAction(find_in_page_action)
 
+        download_manager_action = QAction("Download Manager", self)
+        download_manager_action.triggered.connect(self.show_download_manager)
+        file_menu.addAction(download_manager_action)
+
         bookmark_menu = menu_bar.addMenu("Bookmarks")
         self.bookmarks_action = QAction("Bookmarks", self)
         self.bookmarks_action.triggered.connect(self.show_bookmarks)
@@ -125,6 +138,8 @@ class FrannyBrowser(QMainWindow):
         browser.titleChanged.connect(lambda title, b=browser: self.tabs.setTabText(self.tabs.indexOf(b), title))
         browser.iconChanged.connect(lambda icon, b=browser: self.tabs.setTabIcon(self.tabs.indexOf(b), icon))
         browser.loadFinished.connect(lambda: self.update_address_bar(self.tabs.currentIndex()))
+        # Download handling
+        browser.page().profile().downloadRequested.connect(self.handle_download_requested)
 
     def new_tab(self):
         self.add_new_tab(QUrl("https://www.google.com"), "New Tab")
@@ -264,6 +279,73 @@ class FrannyBrowser(QMainWindow):
         search_text, ok = QInputDialog.getText(self, "Find in Page", "Enter text to find:")
         if ok and search_text:
             self.current_browser().findText(search_text, QWebEnginePage.FindFlags(QWebEnginePage.FindCaseSensitively))
+
+    def import_bookmarks(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Import Bookmarks", "", "JSON Files (*.json)")
+        if path:
+            try:
+                with open(path, "r") as f:
+                    imported = json.load(f)
+                bookmarks = self.load_bookmarks()
+                # Merge and deduplicate
+                for url in imported:
+                    if url not in bookmarks:
+                        bookmarks.append(url)
+                self.save_bookmarks(bookmarks)
+                self.status_bar.showMessage("Bookmarks imported.")
+            except Exception as e:
+                self.status_bar.showMessage(f"Import failed: {e}")
+
+    def export_bookmarks(self):
+        path, _ = QFileDialog.getSaveFileName(self, "Export Bookmarks", "", "JSON Files (*.json)")
+        if path:
+            try:
+                bookmarks = self.load_bookmarks()
+                with open(path, "w") as f:
+                    json.dump(bookmarks, f, indent=2)
+                self.status_bar.showMessage("Bookmarks exported.")
+            except Exception as e:
+                self.status_bar.showMessage(f"Export failed: {e}")
+
+    def add_new_tab(self, qurl=None, label="New Tab"):
+        browser = BrowserTab(self)
+        browser.setUrl(qurl or QUrl("https://www.google.com"))
+        i = self.tabs.addTab(browser, label)
+        self.tabs.setCurrentIndex(i)
+        browser.urlChanged.connect(lambda url, b=browser: self.update_tab_title(url, b))
+        browser.urlChanged.connect(self.update_history)
+        browser.titleChanged.connect(lambda title, b=browser: self.tabs.setTabText(self.tabs.indexOf(b), title))
+        browser.iconChanged.connect(lambda icon, b=browser: self.tabs.setTabIcon(self.tabs.indexOf(b), icon))
+        browser.loadFinished.connect(lambda: self.update_address_bar(self.tabs.currentIndex()))
+        browser.page().profile().downloadRequested.connect(self.handle_download_requested)
+
+    def handle_download_requested(self, download: QWebEngineDownloadItem):
+        save_path, _ = QFileDialog.getSaveFileName(self, "Save File", download.path())
+        if save_path:
+            download.setPath(save_path)
+            download.accept()
+            if not hasattr(self, "downloads"):
+                self.downloads = []
+            self.downloads.append(download)
+            download.finished.connect(self.update_download_manager)
+            self.update_download_manager()
+
+    def show_download_manager(self):
+        if not hasattr(self, "downloads"):
+            self.downloads = []
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Download Manager")
+        layout = QVBoxLayout()
+        for download in self.downloads:
+            status = "Finished" if download.isFinished() else "Downloading"
+            label = QLabel(f"{os.path.basename(download.path())} - {status}")
+            layout.addWidget(label)
+        dialog.setLayout(layout)
+        dialog.exec_()
+
+    def update_download_manager(self):
+        # Optionally refresh the download manager dialog if open
+        pass
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

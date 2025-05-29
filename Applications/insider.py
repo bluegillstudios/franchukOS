@@ -87,6 +87,7 @@ class Insider:
         default = Image.new("RGB", (150, 150), color="#444")
         self.album_image = ImageTk.PhotoImage(default)
         self.album_art_label.config(image=self.album_image)
+        self.album_art_label.image = self.album_image  
 
     def add_to_playlist(self):
         files = filedialog.askopenfilenames(filetypes=[("Audio Files", "*.mp3 *.wav *.ogg *.flac")])
@@ -184,6 +185,7 @@ class Insider:
             img = Image.new("RGB", (150, 150), "#444")
         self.album_image = ImageTk.PhotoImage(img)
         self.album_art_label.config(image=self.album_image)
+        self.album_art_label.image = self.album_image 
 
     def run(self):
         self.root.mainloop()

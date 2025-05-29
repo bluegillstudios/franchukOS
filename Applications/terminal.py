@@ -30,7 +30,7 @@ class Terminal(tk.Toplevel):
                             font=("Consolas", 11), undo=True, wrap="word",
                             borderwidth=0, highlightthickness=0, padx=10, pady=10)
         self.text.pack(fill="both", expand=True, padx=10, pady=10)
-        self.text.insert("end", "Welcome to the Terminal, v0.7\n" + self.PROMPT)
+        self.text.insert("end", "Welcome to the FranchukOS Terminal, v0.7.4.2. If you got here by mistake, it's ok! Just close this tab and carry on.\n" + self.PROMPT)
         self.text.bind("<Return>", self.handle_enter)
         self.text.bind("<Up>", self.history_up)
         self.text.bind("<Down>", self.history_down)
@@ -68,7 +68,7 @@ class Terminal(tk.Toplevel):
             "arch": self.show_architecture,
             "python": self.run_python_interpreter,
             "help": self.show_help,
-            "version": lambda args: "FranchukOS version 30.1.1.7977.191 (codenamed Rainier). Terminal version v0.7.4.2",
+            "version": lambda args: "FranchukOS version 31.0.2279.101 (codenamed Madre). Terminal version v0.7.4.2",
             "rename": self.rename_file,
         }
 
@@ -146,8 +146,7 @@ class Terminal(tk.Toplevel):
 
     def clear_terminal(self, args):
         self.text.delete(1.0, "end")
-        return "Welcome to the Terminal, v0.7"
-
+        
     def quit_terminal(self, args):
         self.destroy()
         return ""
