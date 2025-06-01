@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
-from Config.manager import load_profiles, save_profiles
+from config.manager import load_profiles, save_profiles
 from PIL import Image, ImageTk 
 from playsound import playsound
 import os

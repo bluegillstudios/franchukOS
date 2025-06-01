@@ -6,7 +6,6 @@ import threading
 from Graphics.login import LoginApp  
 from desktop import Desktop
 from Graphics.taskbar import Taskbar
-from Applications.whatsnew import WhatsNewApp
 import pygame
 
 SPLASH_DURATION = 3  # seconds
@@ -50,9 +49,7 @@ def start_login():
     taskbar = Taskbar()
     threading.Thread(target=desktop.run, daemon=True).start()
     threading.Thread(target=taskbar.run, daemon=True).start()
-    whatsnew = WhatsNewApp()
-    whatsnew.mainloop()
-
+    
 def main():
     show_splash(start_login)
 
