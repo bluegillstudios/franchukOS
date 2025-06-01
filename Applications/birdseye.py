@@ -436,9 +436,34 @@ class Birdseye(QMainWindow):
             palette.setColor(QPalette.Link, QColor(42, 130, 218))
             palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
             palette.setColor(QPalette.HighlightedText, Qt.black)
+            app.setPalette(palette)
+            # Set editor and tab widget background/text color and remove border
+            self.setStyleSheet("""
+                QPlainTextEdit, QTextEdit {
+                    background: #1e1e1e;
+                    color: #ffffff;
+                    border: none;
+                }
+                QTabWidget::pane {
+                    border: none;
+                    background: #353535;
+                }
+                QTabBar::tab {
+                    background: #353535;
+                    color: #ffffff;
+                }
+                QTabBar::tab:selected {
+                    background: #222222;
+                }
+                QTreeView {
+                    background: #232323;
+                    color: #ffffff;
+                }
+            """)
         else:
             palette = app.style().standardPalette()
-        app.setPalette(palette)
+            app.setPalette(palette)
+            self.setStyleSheet("")  # Reset to default
         self.statusBar().showMessage(f"{theme} theme applied", 2000)
 
     def toggle_split_view(self):
