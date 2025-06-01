@@ -17,20 +17,75 @@ import getpass
 class Terminal(tk.Toplevel):
     PROMPT = ">>> "
 
-    def __init__(self, master=None):
+    THEMES = {
+        "Dark": {
+            "bg": "#1e1e1e",
+            "fg": "#00ff00",
+            "insertbackground": "white",
+            "prompt_fg": "#00ff00",
+        },
+        "Light": {
+            "bg": "#f8f8f8",
+            "fg": "#222222",
+            "insertbackground": "black",
+            "prompt_fg": "#0055aa",
+        },
+        "Solarized": {
+            "bg": "#002b36",
+            "fg": "#839496",
+            "insertbackground": "#93a1a1",
+            "prompt_fg": "#b58900",
+        },
+        "Monokai": {
+            "bg": "#272822",
+            "fg": "#f8f8f2",
+            "insertbackground": "#f8f8f0",
+            "prompt_fg": "#a6e22e",
+        },
+        "Gruvbox": {
+            "bg": "#282828",
+            "fg": "#ebdbb2",
+            "insertbackground": "#fbf1c7",
+            "prompt_fg": "#fabd2f",
+        },
+        "Dracula": {
+            "bg": "#282a36",
+            "fg": "#f8f8f2",
+            "insertbackground": "#f8f8f2",
+            "prompt_fg": "#bd93f9",
+        },
+        "Nord": {
+            "bg": "#2e3440",
+            "fg": "#d8dee9",
+            "insertbackground": "#eceff4",
+            "prompt_fg": "#88c0d0",
+        },
+        "High Contrast": {
+            "bg": "#000000",
+            "fg": "#ffffff",
+            "insertbackground": "#ffffff",
+            "prompt_fg": "#ffff00",
+        }
+    }
+
+    def __init__(self, master=None, theme="Dark"):
         super().__init__(master)
-        self.title("FranchukOS Terminal v0.7")
+        self.title("FranchukOS Terminal v0.8.0")
         self.geometry("800x500")
-        self.configure(bg="#1e1e1e")
+        self.current_theme = theme
+        self.configure(bg=self.THEMES[theme]["bg"])
         self.style = ttk.Style()
         self.style.theme_use("clam")
-        self.style.configure("TText", background="#1e1e1e", foreground="#1a5e1a", font=("Consolas", 11))
+        self.style.configure("TText", background=self.THEMES[theme]["bg"], foreground=self.THEMES[theme]["fg"], font=("Consolas", 11))
 
-        self.text = tk.Text(self, bg="#1e1e1e", fg="#00ff00", insertbackground="white",
+        self.text = tk.Text(self, bg=self.THEMES[theme]["bg"], fg=self.THEMES[theme]["fg"], insertbackground=self.THEMES[theme]["insertbackground"],
                             font=("Consolas", 11), undo=True, wrap="word",
                             borderwidth=0, highlightthickness=0, padx=10, pady=10)
         self.text.pack(fill="both", expand=True, padx=10, pady=10)
-        self.text.insert("end", "Welcome to the FranchukOS Terminal, v0.7.4.2. If you got here by mistake, it's ok! Just close this tab and carry on.\n" + self.PROMPT)
+        self.text.insert("end", "Welcome to the FranchukOS Terminal, v0.8. If you got here by mistake, it's ok! Just close this tab and carry on.\n", "welcome")
+        self.text.insert("end", self.PROMPT, "prompt")
+        self.text.tag_configure("prompt", foreground=self.THEMES[theme]["prompt_fg"])
+        self.text.tag_configure("welcome", foreground=self.THEMES[theme]["fg"])
         self.text.bind("<Return>", self.handle_enter)
         self.text.bind("<Up>", self.history_up)
         self.text.bind("<Down>", self.history_down)
@@ -70,7 +125,24 @@ class Terminal(tk.Toplevel):
             "help": self.show_help,
             "version": lambda args: "FranchukOS version 31.3.6912.201 (codenamed Madre). Terminal version v0.7.4.2",
             "rename": self.rename_file,
+            "theme": self.set_theme_command,
         }
+
+    def set_theme(self, theme):
+        if theme not in self.THEMES:
+            return
+        self.current_theme = theme
+        colors = self.THEMES[theme]
+        self.configure(bg=colors["bg"])
+        self.text.config(bg=colors["bg"], fg=colors["fg"], insertbackground=colors["insertbackground"])
+        self.text.tag_configure("prompt", foreground=colors["prompt_fg"])
+        self.text.tag_configure("welcome", foreground=colors["fg"])
+
+    def set_theme_command(self, args):
+        if not args or args[0] not in self.THEMES:
+            return "Available themes: " + ", ".join(self.THEMES.keys())
+        self.set_theme(args[0])
+        return f"Theme set to {args[0]}"
 
     def handle_enter(self, event=None):
         # Get the current line (from the prompt onwards)
@@ -88,7 +160,8 @@ class Terminal(tk.Toplevel):
         output = self.run_code(code_line)
         if output:
             self.text.insert("end", output.strip() + "\n")
-        self.text.insert("end", self.PROMPT)
+        # Insert prompt with color
+        self.text.insert("end", self.PROMPT, "prompt")
         self.text.see("end")
         return "break"
 
