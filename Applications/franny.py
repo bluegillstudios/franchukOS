@@ -20,16 +20,24 @@ class BrowserTab(QWebEngineView):
         default_agent = profile.httpUserAgent()
         custom_agent = default_agent.replace(
             default_agent.split(' ')[0],
-            "Franny/15.0.1988.0"
+            "Franny/15.0.1988.56"
         )
         profile.setHttpUserAgent(custom_agent)
         self.setUrl(QUrl("https://www.google.com"))
+        self.page().fullScreenRequested.connect(self.handle_fullscreen_request)
+
+    def handle_fullscreen_request(self, request):
+        if request.toggleOn():
+            self.window().showFullScreen()
+        else:
+            self.window().showNormal()
+        request.accept()
 
 class FrannyBrowser(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Franny Browser (15.0.1988.0)")
+        self.setWindowTitle("Franny Browser (15.0.1988.56)")
         self.setGeometry(100, 100, 1024, 768)
 
         self.tabs = QTabWidget(self)

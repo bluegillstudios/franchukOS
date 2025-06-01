@@ -37,7 +37,7 @@ class Franpaint(QMainWindow):
         self.undo_stack = []
         self.redo_stack = []
 
-        self.fill_shapes = False  # For fill option
+        self.fill_shapes = False 
         self.current_fill_color = Qt.white  # Default fill color
 
         self.brush_shape = 'round'  
@@ -325,7 +325,7 @@ class Franpaint(QMainWindow):
             self.canvas.setPixmap(self.pixmap)
 
     def show_about(self):
-        QMessageBox.about(self, "About Franpaint", "Franpaint v3.2.9\nA simple paint program for FranchukOS.\n Copyright (c) 2025 the FranchukOS Project Authors.")
+        QMessageBox.about(self, "About Franpaint", "Franpaint v3.3.35\nA simple paint program for FranchukOS.\n Copyright (c) 2025 the FranchukOS Project Authors.")
 
 
 if __name__ == "__main__":
