@@ -6,7 +6,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtWebEngineWidgets import *
 from PyQt5.QtWebEngineWidgets import QWebEngineDownloadItem
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QPalette, QColor
 import json
 import os
 
@@ -16,18 +16,49 @@ HISTORY_PATH = "config/history.json"
 class BrowserTab(QWebEngineView):
     def __init__(self, parent=None):
         super().__init__(parent)
+        profile = self.page().profile()
+        default_agent = profile.httpUserAgent()
+        custom_agent = default_agent.replace(
+            default_agent.split(' ')[0],
+            "Franny/15.0.1988.56"
+        )
+        profile.setHttpUserAgent(custom_agent)
         self.setUrl(QUrl("https://www.google.com"))
+        self.page().fullScreenRequested.connect(self.handle_fullscreen_request)
+
+    def handle_fullscreen_request(self, request):
+        if request.toggleOn():
+            self.window().showFullScreen()
+        else:
+            self.window().showNormal()
+        request.accept()
 
 class FrannyBrowser(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Franny Browser (14.5.6078.275)")
+        self.setWindowTitle("Franny Browser (15.0.1988.56)")
         self.setGeometry(100, 100, 1024, 768)
 
         self.tabs = QTabWidget(self)
         self.tabs.setTabsClosable(True)
         self.tabs.setMovable(True)
+        self.tabs.setStyleSheet("""
+            QTabBar::tab {
+                background: #444;
+                color: #fff;
+                padding: 8px 20px;
+                border-radius: 8px 8px 0 0;
+                margin-right: 2px;
+            }
+            QTabBar::tab:selected {
+                background: #222;
+                color: #00aaff;
+            }
+            QTabWidget::pane {
+                border-top: 2px solid #222;
+            }
+        """)
         self.tabs.tabCloseRequested.connect(self.close_tab)
         self.tabs.currentChanged.connect(self.update_address_bar)
         self.setCentralWidget(self.tabs)
@@ -46,22 +77,27 @@ class FrannyBrowser(QMainWindow):
 
     def init_toolbar(self):
         self.toolbar = QToolBar("Navigation", self)
-        self.toolbar.setIconSize(QSize(16, 16))
+        self.toolbar.setIconSize(QSize(24, 24)) 
+        self.toolbar.setStyleSheet("QToolBar { spacing: 8px; }")  
         self.addToolBar(self.toolbar)
 
         back_btn = QAction(QIcon.fromTheme("go-previous"), "Back", self)
+        back_btn.setToolTip("Go Back")
         back_btn.triggered.connect(lambda: self.current_browser().back())
         self.toolbar.addAction(back_btn)
 
         forward_btn = QAction(QIcon.fromTheme("go-next"), "Forward", self)
+        forward_btn.setToolTip("Go Forward")
         forward_btn.triggered.connect(lambda: self.current_browser().forward())
         self.toolbar.addAction(forward_btn)
 
         reload_btn = QAction(QIcon.fromTheme("view-refresh"), "Reload", self)
+        reload_btn.setToolTip("Reload Page")
         reload_btn.triggered.connect(lambda: self.current_browser().reload())
         self.toolbar.addAction(reload_btn)
 
         home_btn = QAction(QIcon.fromTheme("go-home"), "Home", self)
+        home_btn.setToolTip("Go Home")
         home_btn.triggered.connect(self.go_home)
         self.toolbar.addAction(home_btn)
 
@@ -72,6 +108,7 @@ class FrannyBrowser(QMainWindow):
         self.toolbar.addWidget(self.address_bar)
 
         new_tab_btn = QAction(QIcon.fromTheme("tab-new"), "New Tab", self)
+        new_tab_btn.setToolTip("Open New Tab")
         new_tab_btn.triggered.connect(self.new_tab)
         self.toolbar.addAction(new_tab_btn)
 
@@ -344,11 +381,26 @@ class FrannyBrowser(QMainWindow):
         dialog.exec_()
 
     def update_download_manager(self):
-        # Optionally refresh the download manager dialog if open
         pass
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    app.setStyle("Fusion")
+    dark_palette = QPalette()
+    dark_palette.setColor(QPalette.Window, QColor(53, 53, 53))
+    dark_palette.setColor(QPalette.WindowText, Qt.white)
+    dark_palette.setColor(QPalette.Base, QColor(35, 35, 35))
+    dark_palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
+    dark_palette.setColor(QPalette.ToolTipBase, Qt.white)
+    dark_palette.setColor(QPalette.ToolTipText, Qt.white)
+    dark_palette.setColor(QPalette.Text, Qt.white)
+    dark_palette.setColor(QPalette.Button, QColor(53, 53, 53))
+    dark_palette.setColor(QPalette.ButtonText, Qt.white)
+    dark_palette.setColor(QPalette.BrightText, Qt.red)
+    dark_palette.setColor(QPalette.Link, QColor(42, 130, 218))
+    dark_palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
+    dark_palette.setColor(QPalette.HighlightedText, Qt.black)
+    app.setPalette(dark_palette)
     window = FrannyBrowser()
     window.show()
     sys.exit(app.exec_())

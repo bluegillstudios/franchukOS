@@ -16,7 +16,7 @@ import sys
 class Franpaint(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Franpaint v3.2.9")
+        self.setWindowTitle("Franpaint v3.3.35")
         self.setGeometry(100, 100, 800, 600)
 
         self.canvas = QLabel()
@@ -37,8 +37,10 @@ class Franpaint(QMainWindow):
         self.undo_stack = []
         self.redo_stack = []
 
-        self.fill_shapes = False  # For fill option
+        self.fill_shapes = False 
         self.current_fill_color = Qt.white  # Default fill color
+
+        self.brush_shape = 'round'  
 
         self.init_menu()
         self.init_toolbar()
@@ -106,6 +108,12 @@ class Franpaint(QMainWindow):
         self.brush_size.currentIndexChanged.connect(self.change_pen_width)
         toolbar.addWidget(self.brush_size)
 
+        # Add brush shape selector
+        self.brush_shape_box = QComboBox()
+        self.brush_shape_box.addItems(["Round", "Square"])
+        self.brush_shape_box.currentIndexChanged.connect(self.change_brush_shape)
+        toolbar.addWidget(self.brush_shape_box)
+
         freehand_action = QAction("Freehand", self)
         freehand_action.triggered.connect(lambda: self.set_tool('freehand'))
         toolbar.addAction(freehand_action)
@@ -154,7 +162,15 @@ class Franpaint(QMainWindow):
             painter = QPainter(self.pixmap)
             pen = QPen(self.pen_color, self.pen_width, self.pen_style)
             painter.setPen(pen)
-            painter.drawLine(self.last_point, pos)
+            if self.brush_shape == 'round':
+                painter.setBrush(self.pen_color)
+                painter.drawEllipse(pos, self.pen_width // 2, self.pen_width // 2)
+            elif self.brush_shape == 'square':
+                painter.setBrush(self.pen_color)
+                size = self.pen_width
+                painter.drawRect(pos.x() - size // 2, pos.y() - size // 2, size, size)
+            else:
+                painter.drawLine(self.last_point, pos)
             self.last_point = pos
             self.canvas.setPixmap(self.pixmap)
 
@@ -192,6 +208,9 @@ class Franpaint(QMainWindow):
 
     def change_pen_width(self):
         self.pen_width = int(self.brush_size.currentText())
+
+    def change_brush_shape(self):
+        self.brush_shape = self.brush_shape_box.currentText().lower()
 
     def save_image(self):
         file_path, _ = QFileDialog.getSaveFileName(self, "Save Image", "", "PNG Files (*.png);;JPEG Files (*.jpg)")
@@ -306,7 +325,7 @@ class Franpaint(QMainWindow):
             self.canvas.setPixmap(self.pixmap)
 
     def show_about(self):
-        QMessageBox.about(self, "About Franpaint", "Franpaint v3.2.9\nA simple paint program for FranchukOS.\n Copyright (c) 2025 the FranchukOS Project Authors.")
+        QMessageBox.about(self, "About Franpaint", "Franpaint v3.3.35\nA simple paint program for FranchukOS.\n Copyright (c) 2025 the FranchukOS Project Authors.")
 
 
 if __name__ == "__main__":

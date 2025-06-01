@@ -8,7 +8,7 @@ from config.manager import load_config, save_config
 from core.thememanage import apply_theme
 
 
-OS_VERSION = "FranchukOS Rainier, v31.1.1.6379.132 (x64) 2025-05-25"
+OS_VERSION = "31.3"
 
 class SettingsApp:
     def __init__(self):
