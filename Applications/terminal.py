@@ -68,7 +68,7 @@ class Terminal(tk.Toplevel):
             "arch": self.show_architecture,
             "python": self.run_python_interpreter,
             "help": self.show_help,
-            "version": lambda args: "FranchukOS version 31.0.2279.101 (codenamed Madre). Terminal version v0.7.4.2",
+            "version": lambda args: "FranchukOS version 31.3.6912.201 (codenamed Madre). Terminal version v0.7.4.2",
             "rename": self.rename_file,
         }
 
