@@ -6,10 +6,10 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QTextEdit, QAction, QMenuBar, QMessageBox,
     QSplitter, QTreeView, QFileSystemModel, QHBoxLayout, QComboBox, QLabel
 )
-from PyQt5.QtWidgets import QPlainTextEdit 
-from PyQt5.QtGui import QFont, QSyntaxHighlighter, QTextCharFormat, QColor, QTextCursor, QPainter
+from PyQt5.QtWidgets import QPlainTextEdit, QInputDialog 
+from PyQt5.QtGui import QFont, QSyntaxHighlighter, QTextCharFormat, QColor, QTextCursor, QPainter, QPalette
 from PyQt5.QtCore import Qt, QTimer, QRegExp, QFileInfo, QFileSystemWatcher
-import sys, os
+import sys, os, subprocess
 
 class CodeHighlighter(QSyntaxHighlighter):
     def __init__(self, document):
@@ -52,6 +52,27 @@ class CodeHighlighter(QSyntaxHighlighter):
             'elif', 'else', 'except', 'False', 'finally', 'for', 'from', 'global',
             'if', 'import', 'in', 'is', 'lambda', 'None', 'nonlocal', 'not', 'or',
             'pass', 'raise', 'return', 'True', 'try', 'while', 'with', 'yield'
+        ]
+
+        # Rust keywords
+        rust_keywords = [
+            'as', 'break', 'const', 'continue', 'crate', 'else', 'enum', 'extern',
+            'false', 'fn', 'for', 'if', 'impl', 'in', 'let', 'loop', 'match',
+            'mod', 'move', 'mut', 'pub', 'ref', 'return', 'self', 'Self', 'static',
+            'struct', 'super', 'trait', 'true', 'type', 'unsafe', 'use', 'where',
+            'while', 'async', 'await', 'dyn', 'abstract', 'become', 'box', 'do',
+            'final', 'macro', 'override', 'priv', 'try', 'typeof', 'unsized',
+            'virtual', 'yield'
+        ]
+
+        # JavaScript keywords
+        javascript_keywords = [
+            'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger',
+            'default', 'delete', 'do', 'else', 'export', 'extends', 'finally',
+            'for', 'function', 'if', 'import', 'in', 'instanceof', 'let', 'new',
+            'return', 'super', 'switch', 'this', 'throw', 'try', 'typeof', 'var',
+            'void', 'while', 'with', 'yield', 'enum', 'await', 'implements',
+            'package', 'protected', 'static', 'interface', 'private', 'public'
         ]
 
         all_keywords = set(cpp_keywords + csharp_keywords + python_keywords)
@@ -194,7 +215,7 @@ class EditorTab(QWidget):
 class Birdseye(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Birdseye v2.20.8 (FranchukOS stable build)")
+        self.setWindowTitle("Birdseye v2.5.88")
         self.setGeometry(200, 100, 1000, 700)
 
         # Project sidebar
@@ -264,10 +285,44 @@ class Birdseye(QMainWindow):
 
         # Language selection
         lang_menu = menu.addMenu("Language")
-        for lang in ["Auto", "Python", "C++", "C#", "Plain Text"]:
+        for lang in ["Auto", "Python", "C++", "C#", "Rust", "JavaScript", "Plain Text"]:
             action = QAction(lang, self)
             action.triggered.connect(lambda _, l=lang: self.set_language(l))
             lang_menu.addAction(action)
+
+        # Add Git menu
+        git_menu = menu.addMenu("Git")
+        git_status_action = QAction("Show Status", self)
+        git_status_action.triggered.connect(self.show_git_status)
+        git_menu.addAction(git_status_action)
+        git_commit_action = QAction("Commit...", self)
+        git_commit_action.triggered.connect(self.git_commit)
+        git_menu.addAction(git_commit_action)
+
+        # Theme menu
+        theme_menu = self.menuBar().addMenu("Theme")
+        for theme in ["Light", "Dark"]:
+            action = QAction(theme, self)
+            action.triggered.connect(lambda _, t=theme: self.set_theme(t))
+            theme_menu.addAction(action)
+
+        # About menu
+        help_menu = menu.addMenu("Help")
+        about_action = QAction("About", self)
+        about_action.triggered.connect(self.show_about_dialog)
+        help_menu.addAction(about_action)
+
+    def show_about_dialog(self):
+        QMessageBox.about(
+            self,
+            "About Birdseye",
+            "<b>Birdseye v2.5.88</b><br>"
+            "A simple multi-language code editor for FranchukOS.<br><br>"
+            "Copyright 2025 the FranchukOS project authors.<br>"
+            "Licensed under the Apache License, Version 2.0.<br><br>"
+            "</ul>"
+            "https://github.com/bluegillstudios/franchukOS"
+        )
 
     def set_language(self, lang):
         editor = self.tabs.currentWidget()
@@ -283,6 +338,10 @@ class Birdseye(QMainWindow):
                     lang = "C++"
                 elif ext in [".cs"]:
                     lang = "C#"
+                elif ext in [".rs"]:
+                    lang = "Rust"
+                elif ext in [".js", ".jsx", ".mjs"]:
+                    lang = "JavaScript"
                 else:
                     lang = "Plain Text"
             else:
@@ -290,26 +349,45 @@ class Birdseye(QMainWindow):
         # This really sucks! But just send it. 
         if lang == "Python":
             keywords = [
-            'and', 'as', 'assert', 'break', 'class', 'continue', 'def', 'del',
-            'elif', 'else', 'except', 'False', 'finally', 'for', 'from', 'global',
-            'if', 'import', 'in', 'is', 'lambda', 'None', 'nonlocal', 'not', 'or',
-            'pass', 'raise', 'return', 'True', 'try', 'while', 'with', 'yield'
+                'and', 'as', 'assert', 'break', 'class', 'continue', 'def', 'del',
+                'elif', 'else', 'except', 'False', 'finally', 'for', 'from', 'global',
+                'if', 'import', 'in', 'is', 'lambda', 'None', 'nonlocal', 'not', 'or',
+                'pass', 'raise', 'return', 'True', 'try', 'while', 'with', 'yield'
             ]
         elif lang == "C++":
             keywords = [
-            'int', 'float', 'double', 'char', 'bool', 'void', 'string',
-            'if', 'else', 'switch', 'case', 'while', 'for', 'do', 'break', 'continue',
-            'return', 'struct', 'class', 'public', 'private', 'protected',
-            'new', 'delete', 'try', 'catch', 'throw', 'namespace', 'using',
-            'true', 'false', 'nullptr', 'const', 'static', 'virtual', 'override'
+                'int', 'float', 'double', 'char', 'bool', 'void', 'string',
+                'if', 'else', 'switch', 'case', 'while', 'for', 'do', 'break', 'continue',
+                'return', 'struct', 'class', 'public', 'private', 'protected',
+                'new', 'delete', 'try', 'catch', 'throw', 'namespace', 'using',
+                'true', 'false', 'nullptr', 'const', 'static', 'virtual', 'override'
             ]
         elif lang == "C#":
             keywords = [
-            'var', 'dynamic', 'object', 'string', 'int', 'long', 'decimal',
-            'using', 'namespace', 'get', 'set', 'async', 'await', 'yield',
-            'interface', 'enum', 'event', 'delegate', 'public', 'private', 'protected',
-            'class', 'struct', 'if', 'else', 'switch', 'case', 'while', 'for', 'do', 'break', 'continue',
-            'return', 'try', 'catch', 'throw', 'true', 'false', 'null', 'const', 'static', 'override'
+                'var', 'dynamic', 'object', 'string', 'int', 'long', 'decimal',
+                'using', 'namespace', 'get', 'set', 'async', 'await', 'yield',
+                'interface', 'enum', 'event', 'delegate', 'public', 'private', 'protected',
+                'class', 'struct', 'if', 'else', 'switch', 'case', 'while', 'for', 'do', 'break', 'continue',
+                'return', 'try', 'catch', 'throw', 'true', 'false', 'null', 'const', 'static', 'override'
+            ]
+        elif lang == "Rust":
+            keywords = [
+                'as', 'break', 'const', 'continue', 'crate', 'else', 'enum', 'extern',
+                'false', 'fn', 'for', 'if', 'impl', 'in', 'let', 'loop', 'match',
+                'mod', 'move', 'mut', 'pub', 'ref', 'return', 'self', 'Self', 'static',
+                'struct', 'super', 'trait', 'true', 'type', 'unsafe', 'use', 'where',
+                'while', 'async', 'await', 'dyn', 'abstract', 'become', 'box', 'do',
+                'final', 'macro', 'override', 'priv', 'try', 'typeof', 'unsized',
+                'virtual', 'yield'
+            ]
+        elif lang == "JavaScript":
+            keywords = [
+                'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger',
+                'default', 'delete', 'do', 'else', 'export', 'extends', 'finally',
+                'for', 'function', 'if', 'import', 'in', 'instanceof', 'let', 'new',
+                'return', 'super', 'switch', 'this', 'throw', 'try', 'typeof', 'var',
+                'void', 'while', 'with', 'yield', 'enum', 'await', 'implements',
+                'package', 'protected', 'static', 'interface', 'private', 'public'
             ]
         else:
             keywords = []
@@ -340,6 +418,28 @@ class Birdseye(QMainWindow):
         # Replace the highlighter
         editor.highlighter = CustomHighlighter(editor.text_edit.document())
         self.statusBar().showMessage(f"Language set to {lang}", 2000)
+
+    def set_theme(self, theme):
+        app = QApplication.instance()
+        palette = QPalette()
+        if theme == "Dark":
+            palette.setColor(QPalette.Window, QColor(53, 53, 53))
+            palette.setColor(QPalette.WindowText, Qt.white)
+            palette.setColor(QPalette.Base, QColor(30, 30, 30))
+            palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
+            palette.setColor(QPalette.ToolTipBase, Qt.white)
+            palette.setColor(QPalette.ToolTipText, Qt.white)
+            palette.setColor(QPalette.Text, Qt.white)
+            palette.setColor(QPalette.Button, QColor(53, 53, 53))
+            palette.setColor(QPalette.ButtonText, Qt.white)
+            palette.setColor(QPalette.BrightText, Qt.red)
+            palette.setColor(QPalette.Link, QColor(42, 130, 218))
+            palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
+            palette.setColor(QPalette.HighlightedText, Qt.black)
+        else:
+            palette = app.style().standardPalette()
+        app.setPalette(palette)
+        self.statusBar().showMessage(f"{theme} theme applied", 2000)
 
     def toggle_split_view(self):
         if self.tabs2.isVisible():
@@ -412,6 +512,33 @@ class Birdseye(QMainWindow):
             if editor.file_path:
                 with open(editor.file_path, 'w') as f:
                     f.write(editor.text_edit.toPlainText())
+
+    def show_git_status(self):
+        editor = self.tabs.currentWidget()
+        if not editor or not editor.file_path:
+            self.statusBar().showMessage("No file selected", 2000)
+            return
+        folder = os.path.dirname(editor.file_path)
+        try:
+            result = subprocess.check_output(["git", "-C", folder, "status", "--short"], universal_newlines=True)
+            self.statusBar().showMessage(result.strip() or "Clean", 5000)
+        except Exception as e:
+            self.statusBar().showMessage("Git error: " + str(e), 5000)
+
+    def git_commit(self):
+        editor = self.tabs.currentWidget()
+        if not editor or not editor.file_path:
+            self.statusBar().showMessage("No file selected", 2000)
+            return
+        folder = os.path.dirname(editor.file_path)
+        msg, ok = QInputDialog.getText(self, "Git Commit", "Commit message:")
+        if ok and msg:
+            try:
+                subprocess.check_call(["git", "-C", folder, "add", "."])
+                subprocess.check_call(["git", "-C", folder, "commit", "-m", msg])
+                self.statusBar().showMessage("Committed", 3000)
+            except Exception as e:
+                self.statusBar().showMessage("Git error: " + str(e), 5000)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
