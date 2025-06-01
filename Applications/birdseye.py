@@ -155,16 +155,7 @@ class CodeEditor(QPlainTextEdit):  # Change QTextEdit to QPlainTextEdit
             self.update_line_number_area_width(0)
 
     def highlight_current_line(self):
-        extraSelections = []
-        if not self.isReadOnly():
-            selection = QTextEdit.ExtraSelection()
-            lineColor = QColor(Qt.yellow).lighter(160)
-            selection.format.setBackground(lineColor)
-            selection.format.setProperty(QTextCharFormat.FullWidthSelection, True)
-            selection.cursor = self.textCursor()
-            selection.cursor.clearSelection()
-            extraSelections.append(selection)
-        self.setExtraSelections(extraSelections)
+        self.setExtraSelections([])
 
     def keyPressEvent(self, event):
         # Auto indentation
