@@ -311,7 +311,11 @@ def add_sidebar_button(text, command):
 
 add_sidebar_button("🔍 Search & Install", search_and_install_app)
 add_sidebar_button("🌐 Install from URL", install_from_url)
-add_sidebar_button("📁 Install from File", install_from_file)
+add_sidebar_button("Install From File", lambda: (
+    lambda deb_path=filedialog.askopenfilename(title="Select a .deb file", filetypes=[("Debian Package", "*.deb")]):
+        shutil.copy(deb_path, os.path.join(DOWNLOADS_DIR, os.path.basename(deb_path)))
+        if deb_path else None
+)())
 add_sidebar_button("▶️ Run App", run_app)
 add_sidebar_button("🗑 Uninstall App", uninstall_app)
 add_sidebar_button("📄 Show App Path", show_app_path)

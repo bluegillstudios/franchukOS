@@ -13,6 +13,10 @@ import psutil
 import datetime
 import time
 import getpass
+import tarfile
+import ar
+import tempfile
+import subprocess
 
 class Terminal(tk.Toplevel):
     PROMPT = ">>> "
@@ -127,6 +131,8 @@ class Terminal(tk.Toplevel):
             "version": lambda args: "FranchukOS version 31.3.6912.201 (codenamed Madre). Terminal version v0.9.2.",
             "rename": self.rename_file,
             "theme": self.set_theme_command,
+            "debinstall": self.install_deb_package,
+            "debrun": self.run_deb_binary,
         }
 
     def set_theme(self, theme):
@@ -371,3 +377,49 @@ class Terminal(tk.Toplevel):
             return f"Renamed {args[0]} to {args[1]}"
         except Exception as e:
             return f"Error: {str(e)}"
+
+    def install_deb_package(self, args):
+        if not args:
+            return "Usage: debinstall <path-to-deb> [appname]"
+        deb_path = args[0]
+        app_name = args[1] if len(args) > 1 else os.path.splitext(os.path.basename(deb_path))[0]
+        install_dir = os.path.join(os.getcwd(), f"{app_name}_extracted")
+        os.makedirs(install_dir, exist_ok=True)
+        try:
+            with open(deb_path, 'rb') as f:
+                archive = ar.Archive(f)
+                for entry in archive:
+                    fname = entry.name.decode() if isinstance(entry.name, bytes) else entry.name
+                    if fname.startswith('data.tar'):
+                        ext = fname.split('.')[-1]
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}") as temp_tar:
+                            temp_tar.write(entry.data)
+                            temp_tar_path = temp_tar.name
+                        with tarfile.open(temp_tar_path, 'r:*') as tarf:
+                            tarf.extractall(install_dir)
+                        os.remove(temp_tar_path)
+                        return f"Extracted to {install_dir}"
+            return "No data.tar.* found in deb."
+        except Exception as e:
+            return f"Error extracting deb: {e}"
+
+    def run_deb_binary(self, args):
+        if not args:
+            return "Usage: debrun <extracted-folder> [binaryname]"
+        folder = args[0]
+        bin_dir = os.path.join(folder, "usr", "bin")
+        if not os.path.isdir(bin_dir):
+            return f"No usr/bin directory found in {folder}"
+        binaries = [f for f in os.listdir(bin_dir) if os.path.isfile(os.path.join(bin_dir, f))]
+        if not binaries:
+            return "No binaries found in usr/bin."
+        binary = args[1] if len(args) > 1 and args[1] in binaries else binaries[0]
+        binary_path = os.path.join(bin_dir, binary)
+        try:
+            if platform.system() == "Windows":
+                subprocess.Popen(["wsl", binary_path])
+            else:
+                subprocess.Popen([binary_path])
+            return f"Running {binary_path}"
+        except Exception as e:
+            return f"Error running binary: {e}"
