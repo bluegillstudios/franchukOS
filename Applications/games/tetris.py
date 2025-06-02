@@ -200,12 +200,14 @@ def main():
 
         for pos in shape_pos:
             x, y = pos
-            if y > -1:
+            if 0 <= x < COLS and 0 <= y < ROWS:
                 grid[y][x] = current_piece.color
 
         if change_piece:
             for pos in shape_pos:
-                locked_positions[(pos[0], pos[1])] = current_piece.color
+                x, y = pos
+                if 0 <= x < COLS and 0 <= y < ROWS:
+                    locked_positions[(x, y)] = current_piece.color
             current_piece = next_piece
             next_piece = Piece(3, 0, random.randint(0, len(SHAPES) - 1))
             change_piece = False
