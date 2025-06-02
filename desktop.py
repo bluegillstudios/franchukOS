@@ -4,6 +4,7 @@
 import tkinter as tk
 from PIL import Image, ImageTk
 from Graphics.taskbar import Taskbar, WindowManager
+from Graphics.utils import set_background_image, set_background_color
 from Applications.file_explorer import FileExplorer
 from Applications.terminal import Terminal
 from Applications.settings import SettingsApp

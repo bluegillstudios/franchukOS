@@ -13,24 +13,84 @@ import psutil
 import datetime
 import time
 import getpass
+import tarfile
+import ar
+import tempfile
+import subprocess
 
 class Terminal(tk.Toplevel):
     PROMPT = ">>> "
 
-    def __init__(self, master=None):
+    THEMES = {
+        "Dark": {
+            "bg": "#1e1e1e",
+            "fg": "#00ff00",
+            "insertbackground": "white",
+            "prompt_fg": "#00ff00",
+        },
+        "Light": {
+            "bg": "#f8f8f8",
+            "fg": "#222222",
+            "insertbackground": "black",
+            "prompt_fg": "#0055aa",
+        },
+        "Solarized": {
+            "bg": "#002b36",
+            "fg": "#839496",
+            "insertbackground": "#93a1a1",
+            "prompt_fg": "#b58900",
+        },
+        "Monokai": {
+            "bg": "#272822",
+            "fg": "#f8f8f2",
+            "insertbackground": "#f8f8f0",
+            "prompt_fg": "#a6e22e",
+        },
+        "Gruvbox": {
+            "bg": "#282828",
+            "fg": "#ebdbb2",
+            "insertbackground": "#fbf1c7",
+            "prompt_fg": "#fabd2f",
+        },
+        "Dracula": {
+            "bg": "#282a36",
+            "fg": "#f8f8f2",
+            "insertbackground": "#f8f8f2",
+            "prompt_fg": "#bd93f9",
+        },
+        "Nord": {
+            "bg": "#2e3440",
+            "fg": "#d8dee9",
+            "insertbackground": "#eceff4",
+            "prompt_fg": "#88c0d0",
+        },
+        "High Contrast": {
+            "bg": "#000000",
+            "fg": "#ffffff",
+            "insertbackground": "#ffffff",
+            "prompt_fg": "#ffff00",
+        }
+    }
+
+    def __init__(self, master=None, theme="Dark"):
         super().__init__(master)
-        self.title("FranchukOS Terminal v0.7")
+        self.title("Terminal v0.9.2")
         self.geometry("800x500")
-        self.configure(bg="#1e1e1e")
+        self.current_theme = theme
+        self.configure(bg=self.THEMES[theme]["bg"])
         self.style = ttk.Style()
         self.style.theme_use("clam")
-        self.style.configure("TText", background="#1e1e1e", foreground="#1a5e1a", font=("Consolas", 11))
+        self.style.configure("TText", background=self.THEMES[theme]["bg"], foreground=self.THEMES[theme]["fg"], font=("Consolas", 11))
 
-        self.text = tk.Text(self, bg="#1e1e1e", fg="#00ff00", insertbackground="white",
+        self.text = tk.Text(self, bg=self.THEMES[theme]["bg"], fg=self.THEMES[theme]["fg"], insertbackground=self.THEMES[theme]["insertbackground"],
                             font=("Consolas", 11), undo=True, wrap="word",
                             borderwidth=0, highlightthickness=0, padx=10, pady=10)
         self.text.pack(fill="both", expand=True, padx=10, pady=10)
-        self.text.insert("end", "Welcome to the FranchukOS Terminal, v0.7.4.2. If you got here by mistake, it's ok! Just close this tab and carry on.\n" + self.PROMPT)
+        self.text.insert("end", "Welcome to the FranchukOS Terminal, v0.9.")
+        self.text.insert("If you got here by mistake, it's ok! Just close this tab and carry on.")
+        self.text.insert("end", self.PROMPT, "prompt")
+        self.text.tag_configure("prompt", foreground=self.THEMES[theme]["prompt_fg"])
+        self.text.tag_configure("welcome", foreground=self.THEMES[theme]["fg"])
         self.text.bind("<Return>", self.handle_enter)
         self.text.bind("<Up>", self.history_up)
         self.text.bind("<Down>", self.history_down)
@@ -68,9 +128,28 @@ class Terminal(tk.Toplevel):
             "arch": self.show_architecture,
             "python": self.run_python_interpreter,
             "help": self.show_help,
-            "version": lambda args: "FranchukOS version 31.3.6912.201 (codenamed Madre). Terminal version v0.7.4.2",
+            "version": lambda args: "FranchukOS version 31.3.6912.201 (codenamed Madre). Terminal version v0.9.2.",
             "rename": self.rename_file,
+            "theme": self.set_theme_command,
+            "debinstall": self.install_deb_package,
+            "debrun": self.run_deb_binary,
         }
+
+    def set_theme(self, theme):
+        if theme not in self.THEMES:
+            return
+        self.current_theme = theme
+        colors = self.THEMES[theme]
+        self.configure(bg=colors["bg"])
+        self.text.config(bg=colors["bg"], fg=colors["fg"], insertbackground=colors["insertbackground"])
+        self.text.tag_configure("prompt", foreground=colors["prompt_fg"])
+        self.text.tag_configure("welcome", foreground=colors["fg"])
+
+    def set_theme_command(self, args):
+        if not args or args[0] not in self.THEMES:
+            return "Available themes: " + ", ".join(self.THEMES.keys())
+        self.set_theme(args[0])
+        return f"Theme set to {args[0]}"
 
     def handle_enter(self, event=None):
         # Get the current line (from the prompt onwards)
@@ -88,7 +167,8 @@ class Terminal(tk.Toplevel):
         output = self.run_code(code_line)
         if output:
             self.text.insert("end", output.strip() + "\n")
-        self.text.insert("end", self.PROMPT)
+        # Insert prompt with color
+        self.text.insert("end", self.PROMPT, "prompt")
         self.text.see("end")
         return "break"
 
@@ -297,3 +377,49 @@ class Terminal(tk.Toplevel):
             return f"Renamed {args[0]} to {args[1]}"
         except Exception as e:
             return f"Error: {str(e)}"
+
+    def install_deb_package(self, args):
+        if not args:
+            return "Usage: debinstall <path-to-deb> [appname]"
+        deb_path = args[0]
+        app_name = args[1] if len(args) > 1 else os.path.splitext(os.path.basename(deb_path))[0]
+        install_dir = os.path.join(os.getcwd(), f"{app_name}_extracted")
+        os.makedirs(install_dir, exist_ok=True)
+        try:
+            with open(deb_path, 'rb') as f:
+                archive = ar.Archive(f)
+                for entry in archive:
+                    fname = entry.name.decode() if isinstance(entry.name, bytes) else entry.name
+                    if fname.startswith('data.tar'):
+                        ext = fname.split('.')[-1]
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}") as temp_tar:
+                            temp_tar.write(entry.data)
+                            temp_tar_path = temp_tar.name
+                        with tarfile.open(temp_tar_path, 'r:*') as tarf:
+                            tarf.extractall(install_dir)
+                        os.remove(temp_tar_path)
+                        return f"Extracted to {install_dir}"
+            return "No data.tar.* found in deb."
+        except Exception as e:
+            return f"Error extracting deb: {e}"
+
+    def run_deb_binary(self, args):
+        if not args:
+            return "Usage: debrun <extracted-folder> [binaryname]"
+        folder = args[0]
+        bin_dir = os.path.join(folder, "usr", "bin")
+        if not os.path.isdir(bin_dir):
+            return f"No usr/bin directory found in {folder}"
+        binaries = [f for f in os.listdir(bin_dir) if os.path.isfile(os.path.join(bin_dir, f))]
+        if not binaries:
+            return "No binaries found in usr/bin."
+        binary = args[1] if len(args) > 1 and args[1] in binaries else binaries[0]
+        binary_path = os.path.join(bin_dir, binary)
+        try:
+            if platform.system() == "Windows":
+                subprocess.Popen(["wsl", binary_path])
+            else:
+                subprocess.Popen([binary_path])
+            return f"Running {binary_path}"
+        except Exception as e:
+            return f"Error running binary: {e}"

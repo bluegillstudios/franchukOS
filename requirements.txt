@@ -6,3 +6,7 @@ PyQt5
 PyQtWebEngine
 matplotlib
 pyinstaller
+pyautogui
+ar
+beautifulsoup4 
+requests

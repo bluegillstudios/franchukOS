@@ -45,14 +45,11 @@ def show_splash(next_step_callback):
 def start_login():
     login = LoginApp()
     login.run()  # Wait for login to complete
-
-    # Logged in, proceed to desktop
-    # Initialize the desktop and taskbar
     desktop = Desktop()
     taskbar = Taskbar()
-    desktop.run()
-    taskbar.run()
-
+    threading.Thread(target=desktop.run, daemon=True).start()
+    threading.Thread(target=taskbar.run, daemon=True).start()
+    
 def main():
     show_splash(start_login)
 
