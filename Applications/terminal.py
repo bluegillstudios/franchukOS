@@ -70,7 +70,7 @@ class Terminal(tk.Toplevel):
 
     def __init__(self, master=None, theme="Dark"):
         super().__init__(master)
-        self.title("FranchukOS Terminal v0.8.0")
+        self.title("Terminal v0.9.2")
         self.geometry("800x500")
         self.current_theme = theme
         self.configure(bg=self.THEMES[theme]["bg"])
@@ -82,7 +82,8 @@ class Terminal(tk.Toplevel):
                             font=("Consolas", 11), undo=True, wrap="word",
                             borderwidth=0, highlightthickness=0, padx=10, pady=10)
         self.text.pack(fill="both", expand=True, padx=10, pady=10)
-        self.text.insert("end", "Welcome to the FranchukOS Terminal, v0.8. If you got here by mistake, it's ok! Just close this tab and carry on.\n", "welcome")
+        self.text.insert("end", "Welcome to the FranchukOS Terminal, v0.9.")
+        self.text.insert("If you got here by mistake, it's ok! Just close this tab and carry on.")
         self.text.insert("end", self.PROMPT, "prompt")
         self.text.tag_configure("prompt", foreground=self.THEMES[theme]["prompt_fg"])
         self.text.tag_configure("welcome", foreground=self.THEMES[theme]["fg"])
@@ -123,7 +124,7 @@ class Terminal(tk.Toplevel):
             "arch": self.show_architecture,
             "python": self.run_python_interpreter,
             "help": self.show_help,
-            "version": lambda args: "FranchukOS version 31.3.6912.201 (codenamed Madre). Terminal version v0.7.4.2",
+            "version": lambda args: "FranchukOS version 31.3.6912.201 (codenamed Madre). Terminal version v0.9.2.",
             "rename": self.rename_file,
             "theme": self.set_theme_command,
         }

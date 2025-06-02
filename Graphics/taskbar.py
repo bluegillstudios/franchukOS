@@ -189,9 +189,8 @@ class Taskbar(tk.Frame):
 
         # Productivity submenu
         productivity_menu = tk.Menu(menu, tearoff=0, bg="#1e1e1e", fg="white", activebackground="#444444")
-        productivity_menu.add_command(label="File Explorer", command=self.launch_file_explorer)
-        productivity_menu.add_command(label="Terminal", command=self.launch_terminal)
         productivity_menu.add_command(label="Franny", command=self.launch_franny)
+        productivity_menu.add_command(label="Franny's Pop Shop", command=self.launch_shop)
         productivity_menu.add_command(label="Birdseye", command=self.launch_birdseye)
         productivity_menu.add_command(label="Sheets", command=self.launch_sheets)
         menu.add_cascade(label="Productivity", menu=productivity_menu)
@@ -199,6 +198,8 @@ class Taskbar(tk.Frame):
         # System submenu
         system_menu = tk.Menu(menu, tearoff=0, bg="#1e1e1e", fg="white", activebackground="#444444")
         system_menu.add_command(label="Task Manager", command=self.launch_taskmgr)
+        system_menu.add_command(label="File Explorer", command=self.launch_file_explorer)  
+        system_menu.add_command(label="Terminal", command=self.launch_terminal)
         system_menu.add_command(label="Settings", command=self.launch_settings)
         system_menu.add_command(label="Clock", command=self.launch_clock)
         menu.add_cascade(label="System", menu=system_menu)
@@ -277,7 +278,7 @@ class Taskbar(tk.Frame):
         try:
             subprocess.Popen([sys.executable, "Applications/franny.py"])
         except Exception as e:
-            print(f"Failed to launch Franny v14.5.6078.275: {e}")
+            print(f"Failed to launch Franny: {e}")
     def launch_snake(self):
         self.window_manager.open_window("Snake", SnakeGame)
     def launch_space_invaders(self):
@@ -311,6 +312,11 @@ class Taskbar(tk.Frame):
                 subprocess.Popen([sys.executable, "Applications/games/tetris.py"])
             except Exception as e:
                 print(f"Failed to launch Tetris: {e}")
+    def launch_shop(self):
+        try:
+            subprocess.Popen([sys.executable, "Applications/store.py"])
+        except Exception as e:
+            print(f"Failed to launch Franny's Pop Shop: {e}")
     
     
 
