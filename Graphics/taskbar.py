@@ -186,27 +186,44 @@ class Taskbar(tk.Frame):
         self.after(1000, self.update_time)  
     def show_start_menu(self):
         menu = tk.Menu(self, tearoff=0, bg="#1e1e1e", fg="white", activebackground="#444444", font=("Segoe UI", 10))
-        menu.add_command(label="File Explorer", command=self.launch_file_explorer)
-        menu.add_command(label="Terminal", command=self.launch_terminal)
-        menu.add_command(label="Insider", command=self.launch_insider)
-        menu.add_command(label="Outsider", command=self.launch_outsider)
-        menu.add_command(label="Franny", command=self.launch_franny)
-        menu.add_command(label="Clock", command=self.launch_clock)
-        menu.add_command(label="Franpaint", command=self.launch_franpaint)
-        menu.add_command(label="Task Manager", command=self.launch_taskmgr)
-        menu.add_command(label="Birdseye", command=self.launch_birdseye)
-        menu.add_separator()
-        menu.add_command(label="Snake", command=self.launch_snake)
-        menu.add_command(label="Space Invaders", command=self.launch_space_invaders)
-        menu.add_command(label="Aloha", command=self.launch_aloha)
-        menu.add_separator()
-        menu.add_command(label="Settings", command=self.launch_settings)
+
+        # Productivity submenu
+        productivity_menu = tk.Menu(menu, tearoff=0, bg="#1e1e1e", fg="white", activebackground="#444444")
+        productivity_menu.add_command(label="File Explorer", command=self.launch_file_explorer)
+        productivity_menu.add_command(label="Terminal", command=self.launch_terminal)
+        productivity_menu.add_command(label="Franny", command=self.launch_franny)
+        productivity_menu.add_command(label="Birdseye", command=self.launch_birdseye)
+        productivity_menu.add_command(label="Sheets", command=self.launch_sheets)
+        menu.add_cascade(label="Productivity", menu=productivity_menu)
+
+        # System submenu
+        system_menu = tk.Menu(menu, tearoff=0, bg="#1e1e1e", fg="white", activebackground="#444444")
+        system_menu.add_command(label="Task Manager", command=self.launch_taskmgr)
+        system_menu.add_command(label="Settings", command=self.launch_settings)
+        system_menu.add_command(label="Clock", command=self.launch_clock)
+        menu.add_cascade(label="System", menu=system_menu)
+
+        # Creative submenu
+        creative_menu = tk.Menu(menu, tearoff=0, bg="#1e1e1e", fg="white", activebackground="#444444")
+        creative_menu.add_command(label="Franpaint", command=self.launch_franpaint)
+        creative_menu.add_command(label="Insider", command=self.launch_insider)
+        creative_menu.add_command(label="Outsider", command=self.launch_outsider)
+        menu.add_cascade(label="Creative", menu=creative_menu)
+
+        # Games submenu
+        games_menu = tk.Menu(menu, tearoff=0, bg="#1e1e1e", fg="white", activebackground="#444444")
+        games_menu.add_command(label="Snake", command=self.launch_snake)
+        games_menu.add_command(label="Space Invaders", command=self.launch_space_invaders)
+        games_menu.add_command(label="Aloha", command=self.launch_aloha)
+        menu.add_cascade(label="Games", menu=games_menu)
+
         menu.add_separator()
         menu.add_command(label="Exit", command=self.exit_os)
 
         menu.post(
             self.winfo_rootx() + self.start_button.winfo_x(),
-            self.winfo_rooty() + self.start_button.winfo_y() + 50 )
+            self.winfo_rooty() + self.start_button.winfo_y() + 50
+        )
 
     def exit_os(self):
         confirm = messagebox.askyesno("Exit", "Are you sure you want to exit FranchukOS?")
@@ -269,14 +286,19 @@ class Taskbar(tk.Frame):
         try:
             subprocess.Popen([sys.executable, "Applications/franpaint.py"])
         except Exception as e:
-            print(f"Failed to launch Franpaint v1.77: {e}")
+            print(f"Failed to launch Franpaint: {e}")
     def launch_taskmgr(self):
         self.window_manager.open_window("Task Manager", TaskManager)
     def launch_birdseye(self):
         try:
             subprocess.Popen([sys.executable, "Applications/birdseye.py"])
         except Exception as e:
-            print(f"Failed to launch Birdseye v2.20.8: {e}")
+            print(f"Failed to launch Birdseye: {e}")
+    def launch_sheets(self):
+        try:
+            subprocess.Popen([sys.executable, "Applications/sheets.py"])
+        except Exception as e:
+            print(f"Failed to launch Sheets: {e}")
     
     
 
