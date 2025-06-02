@@ -20,7 +20,7 @@ class BrowserTab(QWebEngineView):
         default_agent = profile.httpUserAgent()
         custom_agent = default_agent.replace(
             default_agent.split(' ')[0],
-            "Franny/15.0.1988.56"
+            "Franny/15.2.2899.1211.4"
         )
         profile.setHttpUserAgent(custom_agent)
         self.setUrl(QUrl("https://www.google.com"))
@@ -37,7 +37,7 @@ class FrannyBrowser(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Franny Browser (15.0.1988.56)")
+        self.setWindowTitle("Franny Browser (v15.2.2899.1211.4)")
         self.setGeometry(100, 100, 1024, 768)
 
         self.tabs = QTabWidget(self)
@@ -69,6 +69,8 @@ class FrannyBrowser(QMainWindow):
 
         self.init_toolbar()
         self.init_menu()
+        self.init_shortcuts()
+        self.init_bookmarks_bar()
 
         self.status_bar = QStatusBar(self)
         self.setStatusBar(self.status_bar)
@@ -165,6 +167,21 @@ class FrannyBrowser(QMainWindow):
         self.bookmarks_action.triggered.connect(self.show_bookmarks)
         bookmark_menu.addAction(self.bookmarks_action)
 
+    def init_bookmarks_bar(self):
+        self.bookmarks_bar = QToolBar("Bookmarks Bar", self)
+        self.bookmarks_bar.setIconSize(QSize(16, 16))
+        self.addToolBar(Qt.TopToolBarArea, self.bookmarks_bar)
+        self.update_bookmarks_bar()
+
+    def update_bookmarks_bar(self):
+        self.bookmarks_bar.clear()
+        bookmarks = self.load_bookmarks()
+        for url in bookmarks:
+            action = QAction(QIcon.fromTheme("bookmark"), url, self)
+            action.setToolTip(url)
+            action.triggered.connect(lambda checked, u=url: self.add_new_tab(QUrl(u), u))
+            self.bookmarks_bar.addAction(action)
+
     def add_new_tab(self, qurl=None, label="New Tab"):
         browser = BrowserTab(self)
         browser.setUrl(qurl or QUrl("https://www.google.com"))
@@ -188,6 +205,7 @@ class FrannyBrowser(QMainWindow):
             title = browser.title()
             self.closed_tabs.append((url, title))
             self.tabs.removeTab(index)
+            browser.deleteLater()  # Free resources
         else:
             self.close()
 
@@ -266,6 +284,7 @@ class FrannyBrowser(QMainWindow):
             bookmarks.append(current_url)
             self.save_bookmarks(bookmarks)
             self.status_bar.showMessage(f"Bookmark added: {current_url}")
+            self.update_bookmarks_bar()
         else:
             self.status_bar.showMessage("This page is already bookmarked.")
 
@@ -275,6 +294,7 @@ class FrannyBrowser(QMainWindow):
             bookmarks.remove(url)
             self.save_bookmarks(bookmarks)
             self.status_bar.showMessage(f"Bookmark removed: {url}")
+            self.update_bookmarks_bar()
         else:
             self.status_bar.showMessage("Bookmark not found.")
 
@@ -364,8 +384,12 @@ class FrannyBrowser(QMainWindow):
             if not hasattr(self, "downloads"):
                 self.downloads = []
             self.downloads.append(download)
-            download.finished.connect(self.update_download_manager)
+            download.finished.connect(lambda: self.notify_download_finished(download))
+            download.downloadProgress.connect(lambda rec, tot: self.update_download_manager())
             self.update_download_manager()
+
+    def notify_download_finished(self, download):
+        self.status_bar.showMessage(f"Download finished: {os.path.basename(download.path())}")
 
     def show_download_manager(self):
         if not hasattr(self, "downloads"):
@@ -375,13 +399,43 @@ class FrannyBrowser(QMainWindow):
         layout = QVBoxLayout()
         for download in self.downloads:
             status = "Finished" if download.isFinished() else "Downloading"
-            label = QLabel(f"{os.path.basename(download.path())} - {status}")
+            progress = ""
+            if not download.isFinished():
+                try:
+                    percent = int((download.receivedBytes() / max(download.totalBytes(), 1)) * 100)
+                    progress = f" ({percent}%)"
+                except Exception:
+                    progress = ""
+            label = QLabel(f"{os.path.basename(download.path())} - {status}{progress}")
             layout.addWidget(label)
+            if download.isFinished():
+                open_btn = QPushButton("Open File Location")
+                open_btn.clicked.connect(lambda _, p=download.path(): os.startfile(os.path.dirname(p)))
+                layout.addWidget(open_btn)
         dialog.setLayout(layout)
         dialog.exec_()
 
     def update_download_manager(self):
         pass
+
+    def init_shortcuts(self):
+        QShortcut(QKeySequence("Ctrl+Tab"), self, activated=self.next_tab)
+        QShortcut(QKeySequence("Ctrl+Shift+Tab"), self, activated=self.prev_tab)
+        QShortcut(QKeySequence("Ctrl+W"), self, activated=lambda: self.close_tab(self.tabs.currentIndex()))
+        QShortcut(QKeySequence("Ctrl+T"), self, activated=self.new_tab)
+        QShortcut(QKeySequence("Ctrl+F"), self, activated=self.find_in_page)
+        QShortcut(QKeySequence("Ctrl++"), self, activated=self.zoom_in)
+        QShortcut(QKeySequence("Ctrl+-"), self, activated=self.zoom_out)
+
+    def next_tab(self):
+        idx = self.tabs.currentIndex()
+        count = self.tabs.count()
+        self.tabs.setCurrentIndex((idx + 1) % count)
+
+    def prev_tab(self):
+        idx = self.tabs.currentIndex()
+        count = self.tabs.count()
+        self.tabs.setCurrentIndex((idx - 1) % count)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
