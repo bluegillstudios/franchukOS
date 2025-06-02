@@ -4,9 +4,11 @@
 import tkinter as tk
 from tkinter import messagebox
 import re
+import tkinter.filedialog as fd
+import json
 
 class SimpleSheet(tk.Tk):
-    def __init__(self, rows=25000, cols=5):
+    def __init__(self, rows=25000, cols=100):
         super().__init__()
         self.title("Sheets")
         self.rows = rows
@@ -15,15 +17,58 @@ class SimpleSheet(tk.Tk):
         self.data = {}
         self.evaluating = set()
 
+        self.visible_rows = 100
+        self.visible_cols = 100
+        self.top_row = 0
+        self.left_col = 0
+
         self.create_menu()
         self.create_widgets()
 
     def create_menu(self):
         menubar = tk.Menu(self)
+        # File menu
+        filemenu = tk.Menu(menubar, tearoff=0)
+        filemenu.add_command(label="New", command=self.new_sheet)
+        filemenu.add_command(label="Open...", command=self.open_sheet)
+        filemenu.add_command(label="Save...", command=self.save_sheet)
+        menubar.add_cascade(label="File", menu=filemenu)
+        # Help menu
         helpmenu = tk.Menu(menubar, tearoff=0)
         helpmenu.add_command(label="Guide", command=self.show_guide)
         menubar.add_cascade(label="Help", menu=helpmenu)
         self.config(menu=menubar)
+
+    def new_sheet(self):
+        self.data.clear()
+        self.top_row = 0
+        self.left_col = 0
+        self.update_cells()
+
+    def open_sheet(self):
+        path = fd.askopenfilename(filetypes=[("Sheet files", "*.json"), ("All files", "*.*")])
+        if not path:
+            return
+        try:
+            with open(path, "r") as f:
+                self.data = {tuple(map(int, k.split(","))): v for k, v in json.load(f).items()}
+            self.top_row = 0
+            self.left_col = 0
+            self.update_cells()
+        except Exception as e:
+            messagebox.showerror("Open Sheet", f"Failed to open: {e}")
+
+    def save_sheet(self):
+        path = fd.asksaveasfilename(defaultextension=".json", filetypes=[("Sheet files", "*.json"), ("All files", "*.*")])
+        if not path:
+            return
+        try:
+            # Only save non-empty cells
+            save_data = {f"{k[0]},{k[1]}": v for k, v in self.data.items() if v != ""}
+            with open(path, "w") as f:
+                json.dump(save_data, f)
+        except Exception as e:
+            messagebox.showerror("Save Sheet", f"Failed to save: {e}")
 
     def show_guide(self):
         guide = (
@@ -38,38 +83,39 @@ class SimpleSheet(tk.Tk):
         messagebox.showinfo("Sheets Guide", guide)
 
     def create_widgets(self):
-        # Scrollable frame setup
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
         container = tk.Frame(self)
         container.grid(row=0, column=0, sticky="nsew")
+        container.grid_rowconfigure(0, weight=1)
+        container.grid_columnconfigure(0, weight=1)
 
         self.canvas = tk.Canvas(container)
         self.canvas.grid(row=0, column=0, sticky="nsew")
 
-        v_scroll = tk.Scrollbar(container, orient="vertical", command=self.canvas.yview)
+        v_scroll = tk.Scrollbar(container, orient="vertical", command=self._on_vscroll)
         v_scroll.grid(row=0, column=1, sticky="ns")
-        h_scroll = tk.Scrollbar(container, orient="horizontal", command=self.canvas.xview)
+        h_scroll = tk.Scrollbar(container, orient="horizontal", command=self._on_hscroll)
         h_scroll.grid(row=1, column=0, sticky="ew")
 
         self.canvas.configure(yscrollcommand=v_scroll.set, xscrollcommand=h_scroll.set)
 
         self.sheet_frame = tk.Frame(self.canvas)
         self.sheet_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
-        self.canvas.create_window((0, 0), window=self.sheet_frame, anchor="nw")
+        self.sheet_window = self.canvas.create_window((0, 0), window=self.sheet_frame, anchor="nw")
 
         # Column headers
-        for c in range(self.cols):
-            label = tk.Label(self.sheet_frame, text=chr(ord('A') + c), borderwidth=1, relief="solid", width=10)
+        for c in range(self.visible_cols):
+            label = tk.Label(self.sheet_frame, text=chr(ord('A') + (c % 26)) + (str(c // 26 + 1) if c >= 26 else ""), borderwidth=1, relief="solid", width=10)
             label.grid(row=0, column=c+1, sticky="nsew")
 
-        # Row headers and visible cells (show only first 100 rows for performance)
-        self.visible_rows = 100
+        # Row headers and visible cells
+        self.cells = {}
         for r in range(self.visible_rows):
             label = tk.Label(self.sheet_frame, text=str(r+1), borderwidth=1, relief="solid", width=4)
             label.grid(row=r+1, column=0, sticky="nsew")
-            for c in range(self.cols):
+            for c in range(self.visible_cols):
                 entry = tk.Entry(self.sheet_frame, width=10)
                 entry.grid(row=r+1, column=c+1, sticky="nsew")
                 entry.bind("<FocusOut>", self.on_focus_out)
@@ -78,46 +124,83 @@ class SimpleSheet(tk.Tk):
 
         # Clear button
         clear_btn = tk.Button(self, text="Clear All", command=self.clear_all)
-        clear_btn.grid(row=1, column=0, columnspan=self.cols+1, sticky="we")
+        clear_btn.grid(row=2, column=0, columnspan=self.visible_cols+1, sticky="we")
 
         # Bind scrolling
         self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.canvas.bind_all("<Shift-MouseWheel>", self._on_shift_mousewheel)
         self.canvas.bind("<Configure>", self._on_canvas_resize)
 
-        self.top_row = 0
         self.update_cells()
 
+    def _on_vscroll(self, *args):
+        if args[0] == "moveto":
+            pos = float(args[1])
+            self.show_rows(int(pos * (self.rows - self.visible_rows)))
+        elif args[0] == "scroll":
+            amount = int(args[1])
+            self.show_rows(self.top_row + amount)
+
+    def _on_hscroll(self, *args):
+        if args[0] == "moveto":
+            pos = float(args[1])
+            self.show_cols(int(pos * (self.cols - self.visible_cols)))
+        elif args[0] == "scroll":
+            amount = int(args[1])
+            self.show_cols(self.left_col + amount)
+
     def _on_mousewheel(self, event):
-        # Scroll vertically and update visible rows
         delta = -1 if event.delta > 0 else 1
-        new_top = self.top_row + delta * 5
-        self.show_rows(max(0, min(self.rows - self.visible_rows, new_top)))
+        self.show_rows(max(0, min(self.rows - self.visible_rows, self.top_row + delta * 5)))
+
+    def _on_shift_mousewheel(self, event):
+        delta = -1 if event.delta > 0 else 1
+        self.show_cols(max(0, min(self.cols - self.visible_cols, self.left_col + delta * 5)))
 
     def _on_canvas_resize(self, event):
-        self.canvas.itemconfig(self.sheet_frame, width=event.width)
+        self.canvas.itemconfig(self.sheet_window, width=event.width)
 
     def show_rows(self, top_row):
-        self.top_row = top_row
+        self.top_row = max(0, min(self.rows - self.visible_rows, top_row))
+        self.update_cells()
+
+    def show_cols(self, left_col):
+        self.left_col = max(0, min(self.cols - self.visible_cols, left_col))
+        self.update_cells()
+
+    def update_cells(self):
+        # Update column headers
+        for c in range(self.visible_cols):
+            label = self.sheet_frame.grid_slaves(row=0, column=c+1)
+            if label:
+                col_idx = self.left_col + c
+                col_label = chr(ord('A') + (col_idx % 26)) + (str(col_idx // 26 + 1) if col_idx >= 26 else "")
+                label[0].config(text=col_label)
+        # Update row headers and cells
         for r in range(self.visible_rows):
-            row_num = top_row + r
-            for c in range(self.cols):
-                entry = self.cells.get((r, c))
-                if entry:
-                    val = self.data.get((row_num, c), "")
-                    entry.delete(0, tk.END)
-                    entry.insert(0, val)
-        # Update row headers
-        for r in range(self.visible_rows):
+            row_num = self.top_row + r
             label = self.sheet_frame.grid_slaves(row=r+1, column=0)
             if label:
-                label[0].config(text=str(top_row + r + 1))
+                label[0].config(text=str(row_num + 1))
+            for c in range(self.visible_cols):
+                col_num = self.left_col + c
+                entry = self.cells.get((r, c))
+                if entry:
+                    raw_val = self.data.get((row_num, col_num), "")
+                    if isinstance(raw_val, str) and raw_val.startswith("="):
+                        val = self.safe_evaluate_formula(raw_val[1:], row_num, col_num)
+                        entry.delete(0, tk.END)
+                        entry.insert(0, str(val))
+                    else:
+                        entry.delete(0, tk.END)
+                        entry.insert(0, raw_val)
 
     def on_focus_out(self, event):
         widget = event.widget
         for (r, c), cell in self.cells.items():
             if cell == widget:
                 value = cell.get()
-                self.data[(self.top_row + r, c)] = value
+                self.data[(self.top_row + r, self.left_col + c)] = value
                 self.update_cells()
                 break
 
@@ -125,7 +208,7 @@ class SimpleSheet(tk.Tk):
         widget = event.widget
         for (r, c), cell in self.cells.items():
             if cell == widget:
-                raw_val = self.data.get((self.top_row + r, c), "")
+                raw_val = self.data.get((self.top_row + r, self.left_col + c), "")
                 cell.delete(0, tk.END)
                 cell.insert(0, raw_val)
                 break
@@ -133,18 +216,6 @@ class SimpleSheet(tk.Tk):
     def clear_all(self):
         self.data.clear()
         self.update_cells()
-
-    def update_cells(self):
-        for (r, c), cell in self.cells.items():
-            row_num = self.top_row + r
-            raw_val = self.data.get((row_num, c), "")
-            if isinstance(raw_val, str) and raw_val.startswith("="):
-                val = self.safe_evaluate_formula(raw_val[1:], row_num, c)
-                cell.delete(0, tk.END)
-                cell.insert(0, str(val))
-            else:
-                cell.delete(0, tk.END)
-                cell.insert(0, raw_val)
 
     def safe_evaluate_formula(self, formula, cur_row, cur_col):
         if (cur_row, cur_col) in self.evaluating:

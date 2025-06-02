@@ -215,6 +215,8 @@ class Taskbar(tk.Frame):
         games_menu.add_command(label="Snake", command=self.launch_snake)
         games_menu.add_command(label="Space Invaders", command=self.launch_space_invaders)
         games_menu.add_command(label="Aloha", command=self.launch_aloha)
+        games_menu.add_command(label="Minesweeper :)", command=self.launch_mines)
+        games_menu.add_command(label="Tetris", command=self.launch_tetris)
         menu.add_cascade(label="Games", menu=games_menu)
 
         menu.add_separator()
@@ -299,6 +301,16 @@ class Taskbar(tk.Frame):
             subprocess.Popen([sys.executable, "Applications/sheets.py"])
         except Exception as e:
             print(f"Failed to launch Sheets: {e}")
+    def launch_mines(self):
+        try:
+            subprocess.Popen([sys.executable, "Applications/games/mines.py"])
+        except Exception as e:
+            print(f"Failed to launch Mines: {e}")
+    def launch_tetris(self):
+            try:
+                subprocess.Popen([sys.executable, "Applications/games/tetris.py"])
+            except Exception as e:
+                print(f"Failed to launch Tetris: {e}")
     
     
 
