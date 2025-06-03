@@ -128,7 +128,7 @@ class Terminal(tk.Toplevel):
             "arch": self.show_architecture,
             "python": self.run_python_interpreter,
             "help": self.show_help,
-            "version": lambda args: "FranchukOS version 31.3.6912.201 (codenamed Madre). Terminal version v0.9.2.",
+            "version": lambda args: "FranchukOS version 32.0.2774.121 (codenamed Elbert). Terminal version v0.9.2.",
             "rename": self.rename_file,
             "theme": self.set_theme_command,
             "debinstall": self.install_deb_package,
