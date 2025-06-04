@@ -74,7 +74,7 @@ class Terminal(tk.Toplevel):
 
     def __init__(self, master=None, theme="Dark"):
         super().__init__(master)
-        self.title("Terminal v0.9.2")
+        self.title("Terminal v0.9.3")
         self.geometry("800x500")
         self.current_theme = theme
         self.configure(bg=self.THEMES[theme]["bg"])
@@ -128,7 +128,7 @@ class Terminal(tk.Toplevel):
             "arch": self.show_architecture,
             "python": self.run_python_interpreter,
             "help": self.show_help,
-            "version": lambda args: "FranchukOS version 32.0.2774.121 (codenamed Elbert). Terminal version v0.9.2.",
+            "version": lambda args: "FranchukOS version 32.1.3604.171 (codenamed Elbert). Terminal version v0.9.3.",
             "rename": self.rename_file,
             "theme": self.set_theme_command,
             "debinstall": self.install_deb_package,
