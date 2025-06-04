@@ -6,12 +6,30 @@ from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtWebEngineWidgets import *
 from PyQt5.QtWebEngineWidgets import QWebEngineDownloadItem
-from PyQt5.QtGui import QIcon, QPalette, QColor
+from PyQt5.QtGui import QIcon, QPalette, QColor, QFontMetrics, QKeySequence
+from PyQt5.QtWidgets import QStyle, QProxyStyle, QShortcut
 import json
 import os
 
 BOOKMARKS_PATH = "config/bookmarks.json"
 HISTORY_PATH = "config/history.json"
+
+class ChromiumTabStyle(QProxyStyle):
+    # A custom style to tweak tab size and margins for a Chromium look. 
+    # Doesn't it look awesome????? Right Max?
+    def subControlRect(self, control, option, subControl, widget=None):
+        rect = super().subControlRect(control, option, subControl, widget)
+        if control == QStyle.CC_TabBar and subControl == QStyle.SC_TabBarTab:
+            # Make tabs a bit wider and taller
+            rect.setHeight(rect.height() + 8)
+            rect.setWidth(rect.width() + 24)
+            # Add more left-right padding
+            rect.adjust(-10, 0, 10, 0)
+        return rect
+
+    def drawControl(self, element, option, painter, widget=None):
+        # You can add subtle gradients or shadows here if needed (optional)
+        super().drawControl(element, option, painter, widget)
 
 class BrowserTab(QWebEngineView):
     def __init__(self, parent=None):
@@ -37,28 +55,47 @@ class FrannyBrowser(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Franny Browser (v15.2.2899.1211.4)")
+        self.setWindowTitle("Franny Browser (v16.0.1600.322)")
         self.setGeometry(100, 100, 1024, 768)
 
         self.tabs = QTabWidget(self)
         self.tabs.setTabsClosable(True)
         self.tabs.setMovable(True)
+
+        # Use the ChromiumTabStyle for better tab sizing and margins
+        self.tabs.tabBar().setStyle(ChromiumTabStyle())
+
+        # Update stylesheet for chromium-like tabs (cleaner gradients, hover effects)
         self.tabs.setStyleSheet("""
             QTabBar::tab {
-                background: #444;
-                color: #fff;
-                padding: 8px 20px;
-                border-radius: 8px 8px 0 0;
-                margin-right: 2px;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #4b4b4b, stop:1 #2b2b2b);
+                color: #ddd;
+                padding: 10px 22px;
+                border-top-left-radius: 8px;
+                border-top-right-radius: 8px;
+                margin-right: 3px;
+                font-weight: 500;
+                min-width: 110px;
             }
             QTabBar::tab:selected {
-                background: #222;
-                color: #00aaff;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #1a8cff, stop:1 #0069d9);
+                color: white;
+                font-weight: 700;
+                margin-bottom: 0px;
+            }
+            QTabBar::tab:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #2d9cff, stop:1 #007acc);
+                color: white;
             }
             QTabWidget::pane {
-                border-top: 2px solid #222;
+                border-top: 2px solid #1a8cff;
+                background-color: #222;
             }
         """)
+
         self.tabs.tabCloseRequested.connect(self.close_tab)
         self.tabs.currentChanged.connect(self.update_address_bar)
         self.setCentralWidget(self.tabs)
@@ -79,8 +116,37 @@ class FrannyBrowser(QMainWindow):
 
     def init_toolbar(self):
         self.toolbar = QToolBar("Navigation", self)
-        self.toolbar.setIconSize(QSize(24, 24)) 
-        self.toolbar.setStyleSheet("QToolBar { spacing: 8px; }")  
+        self.toolbar.setIconSize(QSize(28, 28))
+        self.toolbar.setStyleSheet("""
+            QToolBar {
+                background: #222;
+                border-bottom: 1px solid #1a8cff;
+                padding: 6px 10px;
+                spacing: 10px;
+            }
+            QToolButton {
+                background: transparent;
+                border: none;
+                padding: 5px;
+            }
+            QToolButton:hover {
+                background: #1a8cff;
+                border-radius: 4px;
+            }
+            QLineEdit {
+                background: #333;
+                border: 1px solid #555;
+                border-radius: 6px;
+                padding: 6px 10px;
+                color: #eee;
+                min-width: 400px;
+                font-size: 14px;
+            }
+            QLineEdit:focus {
+                border: 1px solid #1a8cff;
+                background: #222;
+            }
+        """)
         self.addToolBar(self.toolbar)
 
         back_btn = QAction(QIcon.fromTheme("go-previous"), "Back", self)
@@ -169,7 +235,26 @@ class FrannyBrowser(QMainWindow):
 
     def init_bookmarks_bar(self):
         self.bookmarks_bar = QToolBar("Bookmarks Bar", self)
-        self.bookmarks_bar.setIconSize(QSize(16, 16))
+        self.bookmarks_bar.setIconSize(QSize(20, 20))
+        self.bookmarks_bar.setStyleSheet("""
+            QToolBar {
+                background: #222;
+                border-bottom: 1px solid #1a8cff;
+                padding: 4px 6px;
+            }
+            QToolButton {
+                background: transparent;
+                border: none;
+                color: #ccc;
+                padding: 4px 10px;
+                font-weight: 500;
+            }
+            QToolButton:hover {
+                background: #1a8cff;
+                color: white;
+                border-radius: 4px;
+            }
+        """)
         self.addToolBar(Qt.TopToolBarArea, self.bookmarks_bar)
         self.update_bookmarks_bar()
 
