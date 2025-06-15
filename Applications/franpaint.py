@@ -4,7 +4,7 @@
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QToolBar, QAction, QColorDialog,
     QFileDialog, QLabel, QComboBox, QMessageBox, QInputDialog, QMenu, 
-    QSizePolicy
+    QSizePolicy, QFontDialog 
 )
 from PyQt5.QtGui import QPainter, QPixmap, QPen, QColor, QMouseEvent, QFont, QImage, QTransform, QClipboard
 from PyQt5.QtCore import Qt, QPoint, QRect
@@ -16,7 +16,7 @@ import sys
 class Franpaint(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Franpaint v3.3.35")
+        self.setWindowTitle("Franpaint v4.1.37")
         self.setGeometry(100, 100, 800, 600)
 
         self.canvas = QLabel()
@@ -42,6 +42,11 @@ class Franpaint(QMainWindow):
 
         self.brush_shape = 'round'  
 
+        # Selection variables
+        self.selection_rect = None
+        self.selection_pixmap = None
+        self.selecting = False
+
         self.init_menu()
         self.init_toolbar()
 
@@ -62,8 +67,12 @@ class Franpaint(QMainWindow):
 
         # Edit Menu
         edit_menu = menubar.addMenu("Edit")
-        edit_menu.addAction("Undo", self.undo)
-        edit_menu.addAction("Redo", self.redo)
+        self.undo_action = QAction("Undo (0)", self)
+        self.undo_action.triggered.connect(self.undo)
+        edit_menu.addAction(self.undo_action)
+        self.redo_action = QAction("Redo (0)", self)
+        self.redo_action.triggered.connect(self.redo)
+        edit_menu.addAction(self.redo_action)
         edit_menu.addSeparator()
         edit_menu.addAction("Crop", self.crop_image)
         edit_menu.addAction("Resize", self.resize_image)
@@ -84,6 +93,9 @@ class Franpaint(QMainWindow):
         tools_menu.addAction(fill_shapes_action)
         tools_menu.addAction("Fill Color...", self.select_fill_color)
         tools_menu.addAction("Pen Color...", self.select_color)
+        tools_menu.addAction("Select Rectangle", lambda: self.set_tool('select_rect'))
+        tools_menu.addAction("Copy Selection", self.copy_selection)
+        tools_menu.addAction("Paste Selection", self.paste_selection)
 
         # Help Menu
         help_menu = menubar.addMenu("Help")
@@ -151,13 +163,29 @@ class Franpaint(QMainWindow):
         if event.button() == Qt.LeftButton:
             self.undo_stack.append(self.pixmap.copy())
             self.redo_stack.clear()
-            self.drawing = True
             pos = self._canvas_pos(event)
-            self.last_point = pos
-            self.current_point = pos
+            if self.current_tool == 'select_rect':
+                self.selecting = True
+                self.last_point = pos
+                self.current_point = pos
+                self.selection_rect = QRect(pos, pos)
+            else:
+                self.drawing = True
+                self.last_point = pos
+                self.current_point = pos
 
     def mouseMoveEvent(self, event: QMouseEvent):
-        if self.drawing and self.current_tool == 'freehand':
+        pos = self._canvas_pos(event)
+        if self.selecting and self.current_tool == 'select_rect':
+            self.current_point = pos
+            self.selection_rect = QRect(self.last_point, self.current_point)
+            temp_pixmap = self.pixmap.copy()
+            painter = QPainter(temp_pixmap)
+            painter.setPen(QPen(Qt.blue, 2, Qt.DashLine))
+            painter.drawRect(self.selection_rect)
+            painter.end()
+            self.canvas.setPixmap(temp_pixmap)
+        elif self.drawing and self.current_tool == 'freehand':
             pos = self._canvas_pos(event)
             painter = QPainter(self.pixmap)
             pen = QPen(self.pen_color, self.pen_width, self.pen_style)
@@ -175,7 +203,17 @@ class Franpaint(QMainWindow):
             self.canvas.setPixmap(self.pixmap)
 
     def mouseReleaseEvent(self, event: QMouseEvent):
-        if event.button() == Qt.LeftButton and self.drawing:
+        pos = self._canvas_pos(event)
+        if self.selecting and self.current_tool == 'select_rect':
+            self.selecting = False
+            self.selection_rect = QRect(self.last_point, pos).normalized()
+            temp_pixmap = self.pixmap.copy()
+            painter = QPainter(temp_pixmap)
+            painter.setPen(QPen(Qt.blue, 2, Qt.DashLine))
+            painter.drawRect(self.selection_rect)
+            painter.end()
+            self.canvas.setPixmap(temp_pixmap)
+        elif event.button() == Qt.LeftButton and self.drawing:
             self.drawing = False
             pos = self._canvas_pos(event)
             painter = QPainter(self.pixmap)
@@ -228,6 +266,7 @@ class Franpaint(QMainWindow):
             self.redo_stack.append(self.pixmap.copy())
             self.pixmap = self.undo_stack.pop()
             self.canvas.setPixmap(self.pixmap)
+            self.update_undo_redo_menu()
         else:
             QMessageBox.information(self, "Undo", "Nothing to undo.")
 
@@ -236,25 +275,38 @@ class Franpaint(QMainWindow):
             self.undo_stack.append(self.pixmap.copy())
             self.pixmap = self.redo_stack.pop()
             self.canvas.setPixmap(self.pixmap)
+            self.update_undo_redo_menu()
         else:
             QMessageBox.information(self, "Redo", "Nothing to redo.")
+
+    def update_undo_redo_menu(self):
+        self.undo_action.setText(f"Undo ({len(self.undo_stack)})")
+        self.redo_action.setText(f"Redo ({len(self.redo_stack)})")
 
     def set_tool(self, tool):
         self.current_tool = tool
 
     def insert_text(self):
         text, ok = QInputDialog.getText(self, "Insert Text", "Enter text:")
-        if ok and text:
-            x, ok_x = QInputDialog.getInt(self, "X Position", "Enter X:", 50)
-            y, ok_y = QInputDialog.getInt(self, "Y Position", "Enter Y:", 50)
-            if ok_x and ok_y:
-                self.undo_stack.append(self.pixmap.copy())
-                self.redo_stack.clear()
-                painter = QPainter(self.pixmap)
-                painter.setPen(QPen(self.pen_color))
-                painter.setFont(QFont("Arial", 14))
-                painter.drawText(x, y, text)
-                self.canvas.setPixmap(self.pixmap)
+        if not (ok and text):
+            return
+        x, ok_x = QInputDialog.getInt(self, "X Position", "Enter X:", 50)
+        y, ok_y = QInputDialog.getInt(self, "Y Position", "Enter Y:", 50)
+        if not (ok_x and ok_y):
+            return
+        font, ok_font = QFontDialog.getFont(QFont("Arial", 14), self, "Select Font")
+        if not ok_font:
+            font = QFont("Arial", 14)
+        color = QColorDialog.getColor(self.pen_color, self, "Select Text Color")
+        if not color.isValid():
+            color = self.pen_color
+        self.undo_stack.append(self.pixmap.copy())
+        self.redo_stack.clear()
+        painter = QPainter(self.pixmap)
+        painter.setPen(QPen(color))
+        painter.setFont(font)
+        painter.drawText(x, y, text)
+        self.canvas.setPixmap(self.pixmap)
 
     def toggle_fill(self, checked):
         self.fill_shapes = checked
@@ -267,27 +319,37 @@ class Franpaint(QMainWindow):
     def export_pdf(self):
         file_path, _ = QFileDialog.getSaveFileName(self, "Export as PDF", "", "PDF Files (*.pdf)")
         if file_path:
+            export_pixmap = self.pixmap
+            if self.selection_rect:
+                reply = QMessageBox.question(self, "Export Selection", "Export only the selected area?", QMessageBox.Yes | QMessageBox.No)
+                if reply == QMessageBox.Yes:
+                    export_pixmap = self.pixmap.copy(self.selection_rect)
             printer = QPrinter(QPrinter.HighResolution)
             printer.setOutputFormat(QPrinter.PdfFormat)
             printer.setOutputFileName(file_path)
             painter = QPainter(printer)
             rect = painter.viewport()
-            size = self.pixmap.size()
+            size = export_pixmap.size()
             size.scale(rect.size(), Qt.KeepAspectRatio)
             painter.setViewport(rect.x(), rect.y(), size.width(), size.height())
-            painter.setWindow(self.pixmap.rect())
-            painter.drawPixmap(0, 0, self.pixmap)
+            painter.setWindow(export_pixmap.rect())
+            painter.drawPixmap(0, 0, export_pixmap)
             painter.end()
 
     def export_svg(self):
         file_path, _ = QFileDialog.getSaveFileName(self, "Export as SVG", "", "SVG Files (*.svg)")
         if file_path:
+            export_pixmap = self.pixmap
+            if self.selection_rect:
+                reply = QMessageBox.question(self, "Export Selection", "Export only the selected area?", QMessageBox.Yes | QMessageBox.No)
+                if reply == QMessageBox.Yes:
+                    export_pixmap = self.pixmap.copy(self.selection_rect)
             generator = QSvgGenerator()
             generator.setFileName(file_path)
-            generator.setSize(self.pixmap.size())
-            generator.setViewBox(self.pixmap.rect())
+            generator.setSize(export_pixmap.size())
+            generator.setViewBox(export_pixmap.rect())
             painter = QPainter(generator)
-            painter.drawPixmap(0, 0, self.pixmap)
+            painter.drawPixmap(0, 0, export_pixmap)
             painter.end()
 
     def copy_to_clipboard(self):
@@ -325,7 +387,30 @@ class Franpaint(QMainWindow):
             self.canvas.setPixmap(self.pixmap)
 
     def show_about(self):
-        QMessageBox.about(self, "About Franpaint", "Franpaint v3.3.35\nA simple paint program for FranchukOS.\n Copyright (c) 2025 the FranchukOS Project Authors.")
+        QMessageBox.about(self, "About Franpaint", "Franpaint v4.1.37\nA simple paint program for FranchukOS.\n Copyright (c) 2025 the FranchukOS Project Authors.")
+
+    def copy_selection(self):
+        if self.selection_rect:
+            self.selection_pixmap = self.pixmap.copy(self.selection_rect)
+            clipboard = QApplication.clipboard()
+            clipboard.setPixmap(self.selection_pixmap)
+            QMessageBox.information(self, "Selection", "Selection copied to clipboard.")
+
+    def paste_selection(self):
+        clipboard = QApplication.clipboard()
+        pixmap = clipboard.pixmap()
+        if not pixmap.isNull():
+            x, ok_x = QInputDialog.getInt(self, "Paste X", "Enter X:", 0)
+            y, ok_y = QInputDialog.getInt(self, "Paste Y", "Enter Y:", 0)
+            if ok_x and ok_y:
+                self.undo_stack.append(self.pixmap.copy())
+                self.redo_stack.clear()
+                painter = QPainter(self.pixmap)
+                painter.drawPixmap(x, y, pixmap)
+                painter.end()
+                self.canvas.setPixmap(self.pixmap)
+        else:
+            QMessageBox.warning(self, "Paste", "No image in clipboard.")
 
 
 if __name__ == "__main__":
