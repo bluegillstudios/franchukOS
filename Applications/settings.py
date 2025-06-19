@@ -6,6 +6,7 @@ from tkinter import ttk, filedialog, messagebox
 from Graphics.utils import set_background_color, set_background_image
 from config.manager import load_config, save_config
 from core.thememanage import apply_theme
+from PIL import Image, ImageTk
 
 
 OS_VERSION = "33.0.0 (Robuna)"
@@ -18,7 +19,21 @@ class SettingsApp:
         self.root = tk.Toplevel()
         self.root.title("Settings")
         self.root.geometry("700x600")
-        self.root.configure(bg="white")
+        # Set wallpaper as background
+        wallpaper = self.config.get("wallpaper", "assets/backgrounds/wallpaper.jpg")
+        if not (wallpaper.startswith("#") or wallpaper in ["black", "white", "gray", "grey"]):
+            try:
+                wallpaper_img = Image.open(wallpaper)
+                wallpaper_img = wallpaper_img.resize((700, 600), Image.LANCZOS)
+                self.wallpaper_photo = ImageTk.PhotoImage(wallpaper_img)
+                self.wallpaper_label = tk.Label(self.root, image=self.wallpaper_photo)
+                self.wallpaper_label.place(x=0, y=0, relwidth=1, relheight=1)
+                self.wallpaper_label.lower()
+            except Exception as e:
+                print(f"Could not load wallpaper in Settings: {e}")
+                self.root.configure(bg="white")
+        else:
+            self.root.configure(bg=wallpaper)
         self.build_ui()
         apply_theme(self.root, self.config.get("theme", "light"))  
 

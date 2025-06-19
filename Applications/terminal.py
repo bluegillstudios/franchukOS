@@ -87,7 +87,7 @@ class Terminal(tk.Toplevel):
                             borderwidth=0, highlightthickness=0, padx=10, pady=10)
         self.text.pack(fill="both", expand=True, padx=10, pady=10)
         self.text.insert("end", "Welcome to the FranchukOS Terminal, v1.1.0\n")
-        self.text.insert("If you got here by mistake, it's ok! Just close this tab and carry on.")
+        self.text.insert("end", "If you got here by mistake, it's ok! Just close this tab and carry on.\n")
         self.text.insert("end", self.PROMPT, "prompt")
         self.text.tag_configure("prompt", foreground=self.THEMES[theme]["prompt_fg"])
         self.text.tag_configure("welcome", foreground=self.THEMES[theme]["fg"])

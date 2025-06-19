@@ -5,7 +5,7 @@ import random
 pygame.init()
 WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Athena v0.4.0")
+pygame.display.set_caption("Athena v0.4.0 (dev channel)")
 clock = pygame.time.Clock()
 
 # Sounds
@@ -154,19 +154,23 @@ def execute_menu_action():
         if selected_option == 0:
             game_state = 'playing'
             player = Player()
-            bullets.clear()
-            enemies[:] = [Enemy(TILE_SIZE*5, TILE_SIZE*5), Enemy(TILE_SIZE*7, TILE_SIZE*6)]
-        else: running = False
+            bullets = []
+            enemies = [Enemy(TILE_SIZE*5, TILE_SIZE*5), Enemy(TILE_SIZE*7, TILE_SIZE*6)]
+        else:
+            running = False
     elif game_state == 'paused':
-        if selected_option == 0: game_state = 'playing'
-        else: running = False
+        if selected_option == 0:
+            game_state = 'playing'
+        else:
+            running = False
     elif game_state == 'gameover':
         if selected_option == 0:
             game_state = 'playing'
             player = Player()
-            bullets.clear()
-            enemies[:] = [Enemy(TILE_SIZE*5, TILE_SIZE*5), Enemy(TILE_SIZE*7, TILE_SIZE*6)]
-        else: running = False
+            bullets = []
+            enemies = [Enemy(TILE_SIZE*5, TILE_SIZE*5), Enemy(TILE_SIZE*7, TILE_SIZE*6)]
+        else:
+            running = False
 
 def main():
     global game_state, selected_option, running
@@ -222,7 +226,7 @@ def main():
             for enemy in enemies: enemy.draw(player)
             for bullet in bullets: bullet.draw(player)
             draw_ui(player)
-        elif game_state == 'menu': draw_menu(menu_options, selected_option, "MAIN MENU")
+        elif game_state == 'menu': draw_menu(menu_options, selected_option, "ATHENA")
         elif game_state == 'paused': draw_menu(pause_options, selected_option, "PAUSED")
         elif game_state == 'gameover': draw_menu(gameover_options, selected_option, "GAME OVER")
         pygame.display.flip()
