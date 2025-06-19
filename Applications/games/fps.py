@@ -5,7 +5,7 @@ import random
 pygame.init()
 WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Raycast FPS")
+pygame.display.set_caption("Athena v0.4.0")
 clock = pygame.time.Clock()
 
 # Sounds
@@ -17,11 +17,11 @@ HALF_FOV = FOV / 2
 NUM_RAYS = 120
 MAX_DEPTH = 800
 DELTA_ANGLE = FOV / NUM_RAYS
+TILE_SIZE = 64
 DIST = NUM_RAYS / (2 * math.tan(HALF_FOV))
 PROJ_COEFF = 3 * DIST * TILE_SIZE
 SCALE = WIDTH // NUM_RAYS
 
-TILE_SIZE = 64
 MAP_WIDTH, MAP_HEIGHT = 10, 10
 
 game_map = [
