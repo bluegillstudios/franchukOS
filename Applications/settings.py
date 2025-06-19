@@ -6,17 +6,34 @@ from tkinter import ttk, filedialog, messagebox
 from Graphics.utils import set_background_color, set_background_image
 from config.manager import load_config, save_config
 from core.thememanage import apply_theme
+from PIL import Image, ImageTk
 
 
-OS_VERSION = "32.0"
+OS_VERSION = "33.0.0 (Robuna)"
 
 class SettingsApp:
     def __init__(self):
         self.config = load_config()
+        if not isinstance(self.config, dict):
+            self.config = {}
         self.root = tk.Toplevel()
         self.root.title("Settings")
         self.root.geometry("700x600")
-        self.root.configure(bg="white")
+        # Set wallpaper as background
+        wallpaper = self.config.get("wallpaper", "assets/backgrounds/wallpaper.jpg")
+        if not (wallpaper.startswith("#") or wallpaper in ["black", "white", "gray", "grey"]):
+            try:
+                wallpaper_img = Image.open(wallpaper)
+                wallpaper_img = wallpaper_img.resize((700, 600), Image.LANCZOS)
+                self.wallpaper_photo = ImageTk.PhotoImage(wallpaper_img)
+                self.wallpaper_label = tk.Label(self.root, image=self.wallpaper_photo)
+                self.wallpaper_label.place(x=0, y=0, relwidth=1, relheight=1)
+                self.wallpaper_label.lower()
+            except Exception as e:
+                print(f"Could not load wallpaper in Settings: {e}")
+                self.root.configure(bg="white")
+        else:
+            self.root.configure(bg=wallpaper)
         self.build_ui()
         apply_theme(self.root, self.config.get("theme", "light"))  
 
@@ -84,7 +101,7 @@ class SettingsApp:
     def build_system_tab(self, parent):
         ttk.Label(parent, text="System Information", font=("Segoe UI", 12, "bold")).pack(anchor="w", pady=(10, 2), padx=10)
         ttk.Label(parent, text=f"FranchukOS Version: {OS_VERSION}", font=("Segoe UI", 10)).pack(anchor="w", padx=20, pady=5)
-        ttk.Label(parent, text="© 2025 FranchukOS Project Authors", font=("Segoe UI", 9)).pack(anchor="w", padx=20, pady=2)
+        ttk.Label(parent, text="© 2025 FranchukOS Project Authors. All rights reserved", font=("Segoe UI", 9)).pack(anchor="w", padx=20, pady=2)
         ttk.Button(parent, text="About", command=self.show_about).pack(anchor="w", padx=20, pady=10)
 
     def build_utilities_tab(self, parent):
@@ -143,11 +160,11 @@ class SettingsApp:
 
     def open_file_explorer(self):
         import subprocess
-        subprocess.Popen('explorer')
+        subprocess.Popen('Applications/file_explorer.py')
 
     def open_terminal(self):
         import subprocess
-        subprocess.Popen('start cmd', shell=True)
+        subprocess.Popen('Applications/terminal.py')
 
     def take_screenshot(self):
         try:

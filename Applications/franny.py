@@ -10,6 +10,8 @@ from PyQt5.QtGui import QIcon, QPalette, QColor, QFontMetrics, QKeySequence
 from PyQt5.QtWidgets import QStyle, QProxyStyle, QShortcut
 import json
 import os
+from collections import defaultdict
+import random
 
 BOOKMARKS_PATH = "config/bookmarks.json"
 HISTORY_PATH = "config/history.json"
@@ -28,7 +30,6 @@ class ChromiumTabStyle(QProxyStyle):
         return rect
 
     def drawControl(self, element, option, painter, widget=None):
-        # You can add subtle gradients or shadows here if needed (optional)
         super().drawControl(element, option, painter, widget)
 
 class BrowserTab(QWebEngineView):
@@ -38,7 +39,7 @@ class BrowserTab(QWebEngineView):
         default_agent = profile.httpUserAgent()
         custom_agent = default_agent.replace(
             default_agent.split(' ')[0],
-            "Franny/15.2.2899.1211.4"
+            "Franny/17.3.3"
         )
         profile.setHttpUserAgent(custom_agent)
         self.setUrl(QUrl("https://www.google.com"))
@@ -51,21 +52,140 @@ class BrowserTab(QWebEngineView):
             self.window().showNormal()
         request.accept()
 
+class PDFViewerTab(QWebEngineView):
+    def __init__(self, pdf_url, parent=None):
+        super().__init__(parent)
+        self.setUrl(pdf_url)
+        self.loadFinished.connect(self.inject_annotation_js)
+
+    def inject_annotation_js(self):
+        js_code = """
+        (function() {
+            if (document.getElementById('franny-pdf-annotator')) return;
+            var canvas = document.createElement('canvas');
+            canvas.id = 'franny-pdf-annotator';
+            canvas.style.position = 'fixed';
+            canvas.style.left = '0';
+            canvas.style.top = '0';
+            canvas.style.width = '100vw';
+            canvas.style.height = '100vh';
+            canvas.style.pointerEvents = 'auto';
+            canvas.style.zIndex = 9999;
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            document.body.appendChild(canvas);
+
+            var ctx = canvas.getContext('2d');
+            var drawing = false;
+            var lastX = 0, lastY = 0;
+
+            function getXY(e) {
+                if (e.touches) {
+                    return [e.touches[0].clientX, e.touches[0].clientY];
+                }
+                return [e.clientX, e.clientY];
+            }
+
+            canvas.addEventListener('mousedown', function(e) {
+                drawing = true;
+                [lastX, lastY] = getXY(e);
+            });
+            canvas.addEventListener('mousemove', function(e) {
+                if (!drawing) return;
+                var [x, y] = getXY(e);
+                ctx.strokeStyle = '#ffeb3b';
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+                ctx.lineTo(x, y);
+                ctx.stroke();
+                [lastX, lastY] = [x, y];
+            });
+            canvas.addEventListener('mouseup', function(e) {
+                drawing = false;
+            });
+            canvas.addEventListener('mouseleave', function(e) {
+                drawing = false;
+            });
+
+            // Touch support
+            canvas.addEventListener('touchstart', function(e) {
+                drawing = true;
+                [lastX, lastY] = getXY(e);
+            });
+            canvas.addEventListener('touchmove', function(e) {
+                if (!drawing) return;
+                var [x, y] = getXY(e);
+                ctx.strokeStyle = '#ffeb3b';
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+                ctx.lineTo(x, y);
+                ctx.stroke();
+                [lastX, lastY] = [x, y];
+                e.preventDefault();
+            }, {passive: false});
+            canvas.addEventListener('touchend', function(e) {
+                drawing = false;
+            });
+
+            // Simple clear button
+            var btn = document.createElement('button');
+            btn.textContent = 'Clear Annotations';
+            btn.style.position = 'fixed';
+            btn.style.top = '10px';
+            btn.style.right = '10px';
+            btn.style.zIndex = 10000;
+            btn.style.background = '#222';
+            btn.style.color = '#fff';
+            btn.style.padding = '8px 16px';
+            btn.style.border = 'none';
+            btn.style.borderRadius = '6px';
+            btn.style.cursor = 'pointer';
+            btn.onclick = function() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            };
+            document.body.appendChild(btn);
+
+            // Resize canvas on window resize
+            window.addEventListener('resize', function() {
+                var img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                ctx.putImageData(img, 0, 0);
+            });
+        })();
+        """
+        self.page().runJavaScript(js_code)
+
+class GroupedTabBar(QTabBar):
+    def paintEvent(self, event):
+        painter = QStylePainter(self)
+        opt = QStyleOptionTab()
+        for i in range(self.count()):
+            self.initStyleOption(opt, i)
+            group = self.tabData(i)
+            if group:
+                color = self.parent().group_colors.get(group, "#888")
+                opt.palette.setColor(QPalette.Window, QColor(color))
+                opt.palette.setColor(QPalette.Button, QColor(color))
+                opt.palette.setColor(QPalette.ButtonText, QColor("#fff"))
+            painter.drawControl(QStyle.CE_TabBarTab, opt)
+
 class FrannyBrowser(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Franny Browser (v16.0.1600.322)")
+        self.setWindowTitle("Franny (v17.3.3)")
         self.setGeometry(100, 100, 1024, 768)
 
         self.tabs = QTabWidget(self)
         self.tabs.setTabsClosable(True)
         self.tabs.setMovable(True)
-
-        # Use the ChromiumTabStyle for better tab sizing and margins
-        self.tabs.tabBar().setStyle(ChromiumTabStyle())
-
-        # Update stylesheet for chromium-like tabs (cleaner gradients, hover effects)
+        self.tab_bar = GroupedTabBar(self.tabs)
+        self.tabs.setTabBar(self.tab_bar)
         self.tabs.setStyleSheet("""
             QTabBar::tab {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
@@ -103,6 +223,8 @@ class FrannyBrowser(QMainWindow):
         self.history = self.load_history()
         self.zoom_level = 1.0
         self.closed_tabs = []  # Stack for closed tabs
+        self.tab_groups = {}  # tab index -> group name
+        self.group_colors = {}  # group name -> color
 
         self.init_toolbar()
         self.init_menu()
@@ -113,6 +235,9 @@ class FrannyBrowser(QMainWindow):
         self.setStatusBar(self.status_bar)
 
         self.add_new_tab(QUrl("https://www.google.com"), "New Tab")
+
+        self.tabs.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tabs.customContextMenuRequested.connect(self.show_tab_context_menu)
 
     def init_toolbar(self):
         self.toolbar = QToolBar("Navigation", self)
@@ -279,6 +404,7 @@ class FrannyBrowser(QMainWindow):
         browser.loadFinished.connect(lambda: self.update_address_bar(self.tabs.currentIndex()))
         # Download handling
         browser.page().profile().downloadRequested.connect(self.handle_download_requested)
+        self.update_tab_group_styles()
 
     def new_tab(self):
         self.add_new_tab(QUrl("https://www.google.com"), "New Tab")
@@ -293,6 +419,17 @@ class FrannyBrowser(QMainWindow):
             browser.deleteLater()  # Free resources
         else:
             self.close()
+        if index in self.tab_groups:
+            del self.tab_groups[index]
+        # Shift group indices after removal
+        new_tab_groups = {}
+        for idx, group in self.tab_groups.items():
+            if idx > index:
+                new_tab_groups[idx - 1] = group
+            elif idx < index:
+                new_tab_groups[idx] = group
+        self.tab_groups = new_tab_groups
+        self.update_tab_group_styles()
 
     def restore_closed_tab(self):
         if self.closed_tabs:
@@ -460,6 +597,7 @@ class FrannyBrowser(QMainWindow):
         browser.iconChanged.connect(lambda icon, b=browser: self.tabs.setTabIcon(self.tabs.indexOf(b), icon))
         browser.loadFinished.connect(lambda: self.update_address_bar(self.tabs.currentIndex()))
         browser.page().profile().downloadRequested.connect(self.handle_download_requested)
+        self.update_tab_group_styles()
 
     def handle_download_requested(self, download: QWebEngineDownloadItem):
         save_path, _ = QFileDialog.getSaveFileName(self, "Save File", download.path())
@@ -521,6 +659,52 @@ class FrannyBrowser(QMainWindow):
         idx = self.tabs.currentIndex()
         count = self.tabs.count()
         self.tabs.setCurrentIndex((idx - 1) % count)
+
+    def show_tab_context_menu(self, pos):
+        index = self.tabs.tabBar().tabAt(pos)
+        if index == -1:
+            return
+        menu = QMenu(self)
+        create_group_action = QAction("Create New Group", self)
+        create_group_action.triggered.connect(lambda: self.create_tab_group(index))
+        menu.addAction(create_group_action)
+        if self.group_colors:
+            submenu = menu.addMenu("Add to Existing Group")
+            for group in self.group_colors:
+                act = QAction(group, self)
+                act.triggered.connect(lambda checked, g=group: self.add_tab_to_group(index, g))
+                submenu.addAction(act)
+        if index in self.tab_groups:
+            remove_action = QAction("Remove from Group", self)
+            remove_action.triggered.connect(lambda: self.remove_tab_from_group(index))
+            menu.addAction(remove_action)
+        menu.exec_(self.tabs.tabBar().mapToGlobal(pos))
+
+    def create_tab_group(self, index):
+        group_name, ok = QInputDialog.getText(self, "New Tab Group", "Enter group name:")
+        if ok and group_name:
+            color = QColor(*random.sample(range(80, 220), 3)).name()
+            self.group_colors[group_name] = color
+            self.tab_groups[index] = group_name
+            self.update_tab_group_styles()
+
+    def add_tab_to_group(self, index, group_name):
+        self.tab_groups[index] = group_name
+        self.update_tab_group_styles()
+
+    def remove_tab_from_group(self, index):
+        if index in self.tab_groups:
+            del self.tab_groups[index]
+            self.update_tab_group_styles()
+
+    def update_tab_group_styles(self):
+        for idx in range(self.tabs.count()):
+            group = self.tab_groups.get(idx)
+            if group:
+                self.tabs.tabBar().setTabData(idx, group)
+            else:
+                self.tabs.tabBar().setTabData(idx, None)
+        self.tabs.tabBar().update()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
