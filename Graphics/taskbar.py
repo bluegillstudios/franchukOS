@@ -216,8 +216,9 @@ class Taskbar(tk.Frame):
         games_menu.add_command(label="Snake", command=self.launch_snake)
         games_menu.add_command(label="Space Invaders", command=self.launch_space_invaders)
         games_menu.add_command(label="Aloha", command=self.launch_aloha)
-        games_menu.add_command(label="Minesweeper :)", command=self.launch_mines)
+        games_menu.add_command(label="Minesweeper", command=self.launch_mines)
         games_menu.add_command(label="Tetris", command=self.launch_tetris)
+        games_menu.add_command(label="Athena", command=self.launch_athena)
         menu.add_cascade(label="Games", menu=games_menu)
 
         menu.add_separator()
@@ -317,6 +318,11 @@ class Taskbar(tk.Frame):
             subprocess.Popen([sys.executable, "Applications/store.py"])
         except Exception as e:
             print(f"Failed to launch Franny's Pop Shop: {e}")
+    def launch_athena(self):
+        try:
+            subprocess.Popen([sys.executable, "Applications/games/fps.py"])
+        except Exception as e:
+            print(f"Failed to launch Athena: {e}")
     
     
 

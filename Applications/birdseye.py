@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QTextEdit, QAction, QMenuBar, QMessageBox,
     QSplitter, QTreeView, QFileSystemModel, QHBoxLayout, QComboBox, QLabel
 )
-from PyQt5.QtWidgets import QPlainTextEdit, QInputDialog 
+from PyQt5.QtWidgets import QPlainTextEdit, QInputDialog, QColorDialog, QDialog, QFormLayout, QPushButton, QDialogButtonBox
 from PyQt5.QtGui import QFont, QSyntaxHighlighter, QTextCharFormat, QColor, QTextCursor, QPainter, QPalette
 from PyQt5.QtCore import Qt, QTimer, QRegExp, QFileInfo, QFileSystemWatcher
 import sys, os, subprocess
@@ -203,10 +203,37 @@ class EditorTab(QWidget):
             with open(path, 'r') as f:
                 self.text_edit.setText(f.read())
 
+class ThemeEditorDialog(QDialog):
+    def __init__(self, parent, current_theme):
+        super().__init__(parent)
+        self.setWindowTitle("Custom Theme Editor")
+        self.colors = current_theme.copy()
+        layout = QFormLayout(self)
+        self.color_buttons = {}
+        for key, val in self.colors.items():
+            btn = QPushButton()
+            btn.setStyleSheet(f"background:{val}")
+            btn.clicked.connect(lambda _, k=key: self.pick_color(k))
+            layout.addRow(key, btn)
+            self.color_buttons[key] = btn
+        self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        layout.addRow(self.buttons)
+
+    def pick_color(self, key):
+        color = QColorDialog.getColor(QColor(self.colors[key]), self)
+        if color.isValid():
+            self.colors[key] = color.name()
+            self.color_buttons[key].setStyleSheet(f"background:{color.name()}")
+
+    def get_theme(self):
+        return self.colors
+
 class Birdseye(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Birdseye v2.5.88")
+        self.setWindowTitle("Birdseye v4.0.15")
         self.setGeometry(200, 100, 1000, 700)
 
         # Project sidebar
@@ -239,6 +266,16 @@ class Birdseye(QMainWindow):
         self.autosave_timer.start(30000)
 
         self.new_tab()
+
+        self.custom_theme = {
+            "Editor Background": "#232323",
+            "Editor Text": "#ffffff",
+            "Tab Background": "#353535",
+            "Tab Text": "#ffffff",
+            "Sidebar": "#232323",
+            "Sidebar Text": "#ffffff",
+            "Highlight": "#42a2da"
+        }
 
     def init_menu(self):
         menu = self.menuBar()
@@ -296,6 +333,9 @@ class Birdseye(QMainWindow):
             action = QAction(theme, self)
             action.triggered.connect(lambda _, t=theme: self.set_theme(t))
             theme_menu.addAction(action)
+        custom_action = QAction("Customize...", self)
+        custom_action.triggered.connect(self.open_theme_editor)
+        theme_menu.addAction(custom_action)
 
         # About menu
         help_menu = menu.addMenu("Help")
@@ -307,7 +347,7 @@ class Birdseye(QMainWindow):
         QMessageBox.about(
             self,
             "About Birdseye",
-            "<b>Birdseye v2.5.88</b><br>"
+            "<b>Birdseye v4.0.15</b><br>"
             "A simple multi-language code editor for FranchukOS.<br><br>"
             "Copyright 2025 the FranchukOS project authors.<br>"
             "Licensed under the Apache License, Version 2.0.<br><br>"
@@ -428,34 +468,141 @@ class Birdseye(QMainWindow):
             palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
             palette.setColor(QPalette.HighlightedText, Qt.black)
             app.setPalette(palette)
-            # Set editor and tab widget background/text color and remove border
-            self.setStyleSheet("""
-                QPlainTextEdit, QTextEdit {
+            self.setStyleSheet(f"""
+                QPlainTextEdit, QTextEdit {{
                     background: #1e1e1e;
                     color: #ffffff;
+                    border: none;
+                }}
+                QTabWidget::pane {{
+                    border: none;
+                    background: #353535;
+                }}
+                QTabBar::tab {{
+                    background: #353535;
+                    color: #ffffff;
+                    font-weight: bold;
+                    border-radius: 8px;
+                    margin: 2px;
+                    padding: 6px 16px;
+                }}
+                QTabBar::tab:selected {{
+                    background: #222222;
+                }}
+                QTreeView {{
+                    background: #232323;
+                    color: #ffffff;
+                    border-radius: 6px;
+                }}
+                QMenuBar {{
+                    background: #353535;
+                    color: #ffffff;
+                }}
+                QMenu {{
+                    background: #232323;
+                    color: #ffffff;
+                }}
+                QPushButton {{
+                    background: #353535;
+                    color: #ffffff;
+                    border-radius: 6px;
+                    padding: 4px 12px;
+                }}
+            """)
+        elif theme == "Light":
+            palette = app.style().standardPalette()
+            app.setPalette(palette)
+            self.setStyleSheet("""
+                QPlainTextEdit, QTextEdit {
+                    background: #ffffff;
+                    color: #222222;
                     border: none;
                 }
                 QTabWidget::pane {
                     border: none;
-                    background: #353535;
+                    background: #e0e0e0;
                 }
                 QTabBar::tab {
-                    background: #353535;
-                    color: #ffffff;
+                    background: #e0e0e0;
+                    color: #222222;
+                    font-weight: bold;
+                    border-radius: 8px;
+                    margin: 2px;
+                    padding: 6px 16px;
                 }
                 QTabBar::tab:selected {
-                    background: #222222;
+                    background: #b0b0b0;
                 }
                 QTreeView {
-                    background: #232323;
-                    color: #ffffff;
+                    background: #f5f5f5;
+                    color: #222222;
+                    border-radius: 6px;
+                }
+                QMenuBar {
+                    background: #e0e0e0;
+                    color: #222222;
+                }
+                QMenu {
+                    background: #f5f5f5;
+                    color: #222222;
+                }
+                QPushButton {
+                    background: #e0e0e0;
+                    color: #222222;
+                    border-radius: 6px;
+                    padding: 4px 12px;
                 }
             """)
-        else:
-            palette = app.style().standardPalette()
-            app.setPalette(palette)
-            self.setStyleSheet("")  # Reset to default
+        elif theme == "Custom":
+            c = self.custom_theme
+            self.setStyleSheet(f"""
+                QPlainTextEdit, QTextEdit {{
+                    background: {c['Editor Background']};
+                    color: {c['Editor Text']};
+                    border: none;
+                }}
+                QTabWidget::pane {{
+                    border: none;
+                    background: {c['Tab Background']};
+                }}
+                QTabBar::tab {{
+                    background: {c['Tab Background']};
+                    color: {c['Tab Text']};
+                    font-weight: bold;
+                    border-radius: 8px;
+                    margin: 2px;
+                    padding: 6px 16px;
+                }}
+                QTabBar::tab:selected {{
+                    background: {c['Highlight']};
+                }}
+                QTreeView {{
+                    background: {c['Sidebar']};
+                    color: {c['Sidebar Text']};
+                    border-radius: 6px;
+                }}
+                QMenuBar {{
+                    background: {c['Tab Background']};
+                    color: {c['Tab Text']};
+                }}
+                QMenu {{
+                    background: {c['Sidebar']};
+                    color: {c['Sidebar Text']};
+                }}
+                QPushButton {{
+                    background: {c['Tab Background']};
+                    color: {c['Tab Text']};
+                    border-radius: 6px;
+                    padding: 4px 12px;
+                }}
+            """)
         self.statusBar().showMessage(f"{theme} theme applied", 2000)
+
+    def open_theme_editor(self):
+        dlg = ThemeEditorDialog(self, self.custom_theme)
+        if dlg.exec_() == QDialog.Accepted:
+            self.custom_theme = dlg.get_theme()
+            self.set_theme("Custom")
 
     def toggle_split_view(self):
         if self.tabs2.isVisible():
