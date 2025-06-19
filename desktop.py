@@ -16,6 +16,10 @@ from Applications.franpaint import Franpaint
 from Applications.games.snake import snake_game as SnakeGame
 from Applications.games.spi import SpaceInvaders
 from Applications.games.aloha import AlohaGameGUI as Aloha
+import threading
+import time
+from config.manager import load_config
+from core.thememanage import apply_theme
 
 class Desktop(tk.Tk):
     def __init__(self):
@@ -33,8 +37,44 @@ class Desktop(tk.Tk):
         self.icons = []
         self.icon_images = [] 
         self.wallpaper_label = None
-        self.set_wallpaper("assets/backgrounds/wallpaper.jpg")
+        self.current_wallpaper = None
+        self.current_theme = None
+        self.config = load_config()
+        if not isinstance(self.config, dict):
+            self.config = {}
+        self.set_wallpaper(self.config.get("wallpaper", "assets/backgrounds/wallpaper.jpg"))
+        apply_theme(self, self.config.get("theme", "light"))  # Apply theme at startup
+        self.poll_wallpaper_config()
         self.setup_ui()
+
+    def poll_wallpaper_config(self):
+        def watcher():
+            while True:
+                try:
+                    config = load_config()
+                    if not isinstance(config, dict):
+                        config = {}
+                    # Wallpaper update
+                    wallpaper = config.get("wallpaper", "assets/backgrounds/wallpaper.jpg")
+                    if wallpaper != self.current_wallpaper:
+                        self.current_wallpaper = wallpaper
+                        if wallpaper.startswith("#") or wallpaper in ["black", "white", "gray", "grey"]:
+                            self.configure(bg=wallpaper)
+                            if self.wallpaper_label:
+                                self.wallpaper_label.destroy()
+                                self.wallpaper_label = None
+                        else:
+                            self.set_wallpaper(wallpaper)
+                    # Theme update
+                    theme = config.get("theme", "light")
+                    if theme != self.current_theme:
+                        self.current_theme = theme
+                        apply_theme(self, theme)
+                    time.sleep(2)
+                except Exception as e:
+                    print(f"Wallpaper/theme watcher error: {e}")
+                    time.sleep(2)
+        threading.Thread(target=watcher, daemon=True).start()
 
     def set_wallpaper(self, path):
         try:
@@ -43,12 +83,18 @@ class Desktop(tk.Tk):
             screen_height = self.winfo_screenheight()
             wallpaper_img = wallpaper_img.resize((screen_width, screen_height), Image.LANCZOS)
             self.wallpaper_photo = ImageTk.PhotoImage(wallpaper_img)
-
-            self.wallpaper_label = tk.Label(self, image=self.wallpaper_photo)
-            self.wallpaper_label.place(x=0, y=0, relwidth=1, relheight=1)
+            if self.wallpaper_label:
+                self.wallpaper_label.config(image=self.wallpaper_photo)
+            else:
+                self.wallpaper_label = tk.Label(self, image=self.wallpaper_photo, bd=0)
+                self.wallpaper_label.place(x=0, y=0, relwidth=1, relheight=1)
+            self.wallpaper_label.lower()  # <-- This line ensures wallpaper is always at the back
         except Exception as e:
             print(f"Could not load wallpaper from {path}: {e}")
             self.configure(bg="black")
+            if self.wallpaper_label:
+                self.wallpaper_label.destroy()
+                self.wallpaper_label = None
 
     def setup_ui(self):
         # Place icons on top of wallpaper

@@ -193,6 +193,7 @@ class Taskbar(tk.Frame):
         productivity_menu.add_command(label="Franny's Pop Shop", command=self.launch_shop)
         productivity_menu.add_command(label="Birdseye", command=self.launch_birdseye)
         productivity_menu.add_command(label="Sheets", command=self.launch_sheets)
+        productivity_menu.add_command(label="Calculator", command=self.launch_calc)
         menu.add_cascade(label="Productivity", menu=productivity_menu)
 
         # System submenu
@@ -323,6 +324,11 @@ class Taskbar(tk.Frame):
             subprocess.Popen([sys.executable, "Applications/games/fps.py"])
         except Exception as e:
             print(f"Failed to launch Athena: {e}")
+    def launch_calc(self):
+        try:
+            subprocess.Popen([sys.executable, "Applications/calculator.py"])
+        except Exception as e:
+            print(f"Failed to launch Calculator: {e}")
     
     
 

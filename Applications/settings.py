@@ -8,11 +8,13 @@ from config.manager import load_config, save_config
 from core.thememanage import apply_theme
 
 
-OS_VERSION = "32.0"
+OS_VERSION = "33.0.0 (Robuna)"
 
 class SettingsApp:
     def __init__(self):
         self.config = load_config()
+        if not isinstance(self.config, dict):
+            self.config = {}
         self.root = tk.Toplevel()
         self.root.title("Settings")
         self.root.geometry("700x600")
@@ -84,7 +86,7 @@ class SettingsApp:
     def build_system_tab(self, parent):
         ttk.Label(parent, text="System Information", font=("Segoe UI", 12, "bold")).pack(anchor="w", pady=(10, 2), padx=10)
         ttk.Label(parent, text=f"FranchukOS Version: {OS_VERSION}", font=("Segoe UI", 10)).pack(anchor="w", padx=20, pady=5)
-        ttk.Label(parent, text="© 2025 FranchukOS Project Authors", font=("Segoe UI", 9)).pack(anchor="w", padx=20, pady=2)
+        ttk.Label(parent, text="© 2025 FranchukOS Project Authors. All rights reserved", font=("Segoe UI", 9)).pack(anchor="w", padx=20, pady=2)
         ttk.Button(parent, text="About", command=self.show_about).pack(anchor="w", padx=20, pady=10)
 
     def build_utilities_tab(self, parent):
@@ -143,11 +145,11 @@ class SettingsApp:
 
     def open_file_explorer(self):
         import subprocess
-        subprocess.Popen('explorer')
+        subprocess.Popen('Applications/file_explorer.py')
 
     def open_terminal(self):
         import subprocess
-        subprocess.Popen('start cmd', shell=True)
+        subprocess.Popen('Applications/terminal.py')
 
     def take_screenshot(self):
         try:

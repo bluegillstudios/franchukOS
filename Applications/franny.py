@@ -30,7 +30,6 @@ class ChromiumTabStyle(QProxyStyle):
         return rect
 
     def drawControl(self, element, option, painter, widget=None):
-        # You can add subtle gradients or shadows here if needed (optional)
         super().drawControl(element, option, painter, widget)
 
 class BrowserTab(QWebEngineView):
@@ -161,6 +160,20 @@ class PDFViewerTab(QWebEngineView):
         """
         self.page().runJavaScript(js_code)
 
+class GroupedTabBar(QTabBar):
+    def paintEvent(self, event):
+        painter = QStylePainter(self)
+        opt = QStyleOptionTab()
+        for i in range(self.count()):
+            self.initStyleOption(opt, i)
+            group = self.tabData(i)
+            if group:
+                color = self.parent().group_colors.get(group, "#888")
+                opt.palette.setColor(QPalette.Window, QColor(color))
+                opt.palette.setColor(QPalette.Button, QColor(color))
+                opt.palette.setColor(QPalette.ButtonText, QColor("#fff"))
+            painter.drawControl(QStyle.CE_TabBarTab, opt)
+
 class FrannyBrowser(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -171,7 +184,8 @@ class FrannyBrowser(QMainWindow):
         self.tabs = QTabWidget(self)
         self.tabs.setTabsClosable(True)
         self.tabs.setMovable(True)
-        self.tabs.tabBar().setStyle(ChromiumTabStyle())
+        self.tab_bar = GroupedTabBar(self.tabs)
+        self.tabs.setTabBar(self.tab_bar)
         self.tabs.setStyleSheet("""
             QTabBar::tab {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
@@ -687,14 +701,10 @@ class FrannyBrowser(QMainWindow):
         for idx in range(self.tabs.count()):
             group = self.tab_groups.get(idx)
             if group:
-                color = self.group_colors.get(group, "#888")
                 self.tabs.tabBar().setTabData(idx, group)
-                self.tabs.tabBar().setTabTextColor(idx, QColor("#fff"))
-                self.tabs.tabBar().setTabBackgroundColor(idx, QColor(color))
             else:
                 self.tabs.tabBar().setTabData(idx, None)
-                self.tabs.tabBar().setTabTextColor(idx, QColor("#ddd"))
-                self.tabs.tabBar().setTabBackgroundColor(idx, QColor("#4b4b4b"))
+        self.tabs.tabBar().update()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
