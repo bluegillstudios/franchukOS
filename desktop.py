@@ -20,6 +20,7 @@ import threading
 import time
 from config.manager import load_config
 from core.thememanage import apply_theme
+import random
 
 class Desktop(tk.Tk):
     def __init__(self):
@@ -169,19 +170,40 @@ class Desktop(tk.Tk):
                     self.activate_screensaver()
                 time.sleep(2)
         threading.Thread(target=check, daemon=True).start()
+        def activate_screensaver(self):
+            self.screensaver_active = True
+            self.screensaver_window = tk.Toplevel(self)
+            self.screensaver_window.attributes("-fullscreen", True)
+            self.screensaver_window.configure(bg="black")
+            self.screensaver_window.lift()
+            self.screensaver_window.focus_set()
+            self.screensaver_window.bind("<Any-KeyPress>", self.reset_screensaver_timer)
+            self.screensaver_window.bind("<Any-Button>", self.reset_screensaver_timer)
+            self.screensaver_window.bind("<Motion>", self.reset_screensaver_timer)
 
-    def activate_screensaver(self):
-        self.screensaver_active = True
-        self.screensaver_window = tk.Toplevel(self)
-        self.screensaver_window.attributes("-fullscreen", True)
-        self.screensaver_window.configure(bg="black")
-        self.screensaver_window.lift()
-        self.screensaver_window.focus_set()
-        self.screensaver_window.bind("<Any-KeyPress>", self.reset_screensaver_timer)
-        self.screensaver_window.bind("<Any-Button>", self.reset_screensaver_timer)
-        self.screensaver_window.bind("<Motion>", self.reset_screensaver_timer)
-        label = tk.Label(self.screensaver_window, text="Screensaver", fg="white", bg="black", font=("Segoe UI", 48))
-        label.pack(expand=True)
+            label = tk.Label(
+                self.screensaver_window,
+                text="Franchuk is waiting....",
+                fg="white",
+                bg="black",
+                font=("Segoe UI", 48)
+            )
+            label.place(x=0, y=0)
+
+            def move_label():
+                if not self.screensaver_active or not self.screensaver_window:
+                    return
+                sw = self.screensaver_window.winfo_width()
+                sh = self.screensaver_window.winfo_height()
+                lw = label.winfo_reqwidth()
+                lh = label.winfo_reqheight()
+                x = random.randint(0, max(0, sw - lw))
+                y = random.randint(0, max(0, sh - lh))
+                label.place(x=x, y=y)
+                self.screensaver_window.after(1200, move_label)
+
+            # Wait for window to update so we get correct dimensions
+            self.screensaver_window.after(100, move_label)
 
     def deactivate_screensaver(self, event=None):
         if self.screensaver_window:
