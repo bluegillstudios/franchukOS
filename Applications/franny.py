@@ -728,6 +728,80 @@ class FrannyBrowser(QMainWindow):
                 self.tabs.tabBar().setTabData(idx, None)
         self.tabs.tabBar().update()
 
+    def save_as_pdf(self):
+        browser = self.current_browser()
+        if not browser:
+            return
+        file_path, _ = QFileDialog.getSaveFileName(self, "Save as PDF", "", "PDF Files (*.pdf)")
+        if file_path:
+            if not file_path.lower().endswith(".pdf"):
+                file_path += ".pdf"
+            def pdf_finished(path, ok):
+                if ok:
+                    self.status_bar.showMessage(f"Saved PDF: {path}")
+                else:
+                    self.status_bar.showMessage("Failed to save PDF.")
+            browser.page().printToPdf(file_path, pageLayout=None, callback=lambda ok: pdf_finished(file_path, ok))
+
+    def show_settings(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Settings")
+        layout = QVBoxLayout()
+
+        home_label = QLabel("Homepage URL:")
+        home_input = QLineEdit(self)
+        home_input.setText(getattr(self, "homepage", "https://www.google.com"))
+        layout.addWidget(home_label)
+        layout.addWidget(home_input)
+
+        zoom_label = QLabel("Default Zoom:")
+        zoom_slider = QSlider(Qt.Horizontal)
+        zoom_slider.setRange(5, 20)
+        zoom_slider.setValue(int(getattr(self, "zoom_level", 1.0) * 10))
+        layout.addWidget(zoom_label)
+        layout.addWidget(zoom_slider)
+
+        save_btn = QPushButton("Save")
+        save_btn.clicked.connect(lambda: self.apply_settings(home_input.text(), zoom_slider.value() / 10, dialog))
+        layout.addWidget(save_btn)
+
+        dialog.setLayout(layout)
+        dialog.exec_()
+
+    def apply_settings(self, homepage, zoom, dialog):
+        self.homepage = homepage
+        self.zoom_level = zoom
+        self.current_browser().setZoomFactor(zoom)
+        self.status_bar.showMessage("Settings applied.")
+        dialog.accept()
+
+    def search_tabs(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Search Tabs")
+        layout = QVBoxLayout()
+        search_bar = QLineEdit()
+        list_widget = QListWidget()
+
+        def update_results():
+            query = search_bar.text().lower()
+            list_widget.clear()
+            for i in range(self.tabs.count()):
+                title = self.tabs.tabText(i).lower()
+                url = self.tabs.widget(i).url().toString().lower()
+                if query in title or query in url:
+                    item = QListWidgetItem(self.tabs.tabText(i))
+                    item.setData(Qt.UserRole, i)
+                    list_widget.addItem(item)
+
+        search_bar.textChanged.connect(update_results)
+        layout.addWidget(search_bar)
+        layout.addWidget(list_widget)
+
+        list_widget.itemDoubleClicked.connect(lambda item: self.tabs.setCurrentIndex(item.data(Qt.UserRole)))
+        dialog.setLayout(layout)
+        update_results()
+        dialog.exec_()
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyle("Fusion")

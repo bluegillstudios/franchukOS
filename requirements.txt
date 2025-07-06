@@ -10,3 +10,4 @@ pyautogui
 ar
 beautifulsoup4 
 requests
+markdown
