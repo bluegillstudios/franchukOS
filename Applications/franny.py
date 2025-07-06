@@ -8,6 +8,8 @@ from PyQt5.QtWebEngineWidgets import *
 from PyQt5.QtWebEngineWidgets import QWebEngineDownloadItem
 from PyQt5.QtGui import QIcon, QPalette, QColor, QFontMetrics, QKeySequence
 from PyQt5.QtWidgets import QStyle, QProxyStyle, QShortcut
+from PyQt5.QtPrintSupport import QPrinter
+from PyQt5.QtWidgets import QListWidget, QListWidgetItem, QSlider
 import json
 import os
 from collections import defaultdict
@@ -39,7 +41,7 @@ class BrowserTab(QWebEngineView):
         default_agent = profile.httpUserAgent()
         custom_agent = default_agent.replace(
             default_agent.split(' ')[0],
-            "Franny/17.3.3"
+            "Franny/18.0.1025.162"
         )
         profile.setHttpUserAgent(custom_agent)
         self.setUrl(QUrl("https://www.google.com"))
@@ -51,6 +53,12 @@ class BrowserTab(QWebEngineView):
         else:
             self.window().showNormal()
         request.accept()
+
+    def show_devtools(self):
+        if not hasattr(self, 'devtools') or self.devtools is None:
+            self.devtools = QWebEngineView()
+            self.page().setDevToolsPage(self.devtools.page())
+        self.devtools.show()
 
 class PDFViewerTab(QWebEngineView):
     def __init__(self, pdf_url, parent=None):
@@ -178,7 +186,7 @@ class FrannyBrowser(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Franny (v17.3.3)")
+        self.setWindowTitle("Franny (v18.0.77)")
         self.setGeometry(100, 100, 1024, 768)
 
         self.tabs = QTabWidget(self)
@@ -352,6 +360,19 @@ class FrannyBrowser(QMainWindow):
         download_manager_action = QAction("Download Manager", self)
         download_manager_action.triggered.connect(self.show_download_manager)
         file_menu.addAction(download_manager_action)
+
+        save_pdf_action = QAction("Save as PDF", self)
+        save_pdf_action.triggered.connect(self.save_as_pdf)
+        file_menu.addAction(save_pdf_action)
+
+        settings_action = QAction("Settings", self)
+        settings_action.triggered.connect(self.show_settings)
+        file_menu.addAction(settings_action)
+
+        devtools_action = QAction("Open DevTools", self)
+        devtools_action.setShortcut("F12")
+        devtools_action.triggered.connect(lambda: self.current_browser().show_devtools())
+        file_menu.addAction(devtools_action)
 
         bookmark_menu = menu_bar.addMenu("Bookmarks")
         self.bookmarks_action = QAction("Bookmarks", self)
@@ -649,6 +670,7 @@ class FrannyBrowser(QMainWindow):
         QShortcut(QKeySequence("Ctrl+F"), self, activated=self.find_in_page)
         QShortcut(QKeySequence("Ctrl++"), self, activated=self.zoom_in)
         QShortcut(QKeySequence("Ctrl+-"), self, activated=self.zoom_out)
+        QShortcut(QKeySequence("Ctrl+Shift+F"), self, activated=self.search_tabs)
 
     def next_tab(self):
         idx = self.tabs.currentIndex()

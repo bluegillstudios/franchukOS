@@ -172,7 +172,7 @@ class SettingsApp:
             import datetime
             filename = f"screenshot_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
             pyautogui.screenshot(filename)
-            messagebox.showinfo("Screenshot", f"Screenshot saved as {filename}")
+            print(f"Screenshot saved as {filename}")
         except ImportError:
             messagebox.showerror("Error", "pyautogui is not installed.")
 

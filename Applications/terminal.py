@@ -133,6 +133,7 @@ class Terminal(tk.Toplevel):
             "theme": self.set_theme_command,
             "debinstall": self.install_deb_package,
             "debrun": self.run_deb_binary,
+            "run": self.run_python_app,  # <-- Add this line
         }
 
     def set_theme(self, theme):
@@ -423,3 +424,28 @@ class Terminal(tk.Toplevel):
             return f"Running {binary_path}"
         except Exception as e:
             return f"Error running binary: {e}"
+
+    def run_python_app(self, args):
+        """
+        Run a Python application from the terminal.
+        Usage: run <script.py> [args...]
+        """
+        if not args:
+            return "Usage: run <script.py> [args...]"
+        script = args[0]
+        script_args = args[1:]
+        if not os.path.isfile(script):
+            return f"Error: File '{script}' not found."
+        try:
+            old_argv = sys.argv
+            sys.argv = [script] + script_args
+            with open(script, "r") as f:
+                code_str = f.read()
+            # Use a new globals dict for script execution
+            script_globals = {"__name__": "__main__", "__file__": script}
+            exec(compile(code_str, script, "exec"), script_globals)
+            sys.argv = old_argv
+            return f"Executed {script}"
+        except Exception as e:
+            sys.argv = old_argv
+            return f"Error running {script}: {e}"

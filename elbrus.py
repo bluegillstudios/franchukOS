@@ -8,7 +8,7 @@ from desktop import Desktop
 from Graphics.taskbar import Taskbar
 import pygame
 
-SPLASH_DURATION = 3  # seconds
+SPLASH_DURATION = 7  # seconds
 
 def show_splash(next_step_callback):
     splash = tk.Tk()
