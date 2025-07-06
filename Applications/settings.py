@@ -9,7 +9,7 @@ from core.thememanage import apply_theme
 from PIL import Image, ImageTk
 
 
-OS_VERSION = "33.0.0 (Robuna)"
+OS_VERSION = "33.1.6 (Mojave) - Stable"
 
 class SettingsApp:
     def __init__(self):

@@ -128,12 +128,12 @@ class Terminal(tk.Toplevel):
             "arch": self.show_architecture,
             "python": self.run_python_interpreter,
             "help": self.show_help,
-            "version": lambda args: "FranchukOS version 33.0.0 (codenamed Robuna). Terminal version v1.1.0.",
+            "version": lambda args: "FranchukOS version 34.1.6 (codenamed Mojave). Terminal version v1.1.4.",
             "rename": self.rename_file,
             "theme": self.set_theme_command,
             "debinstall": self.install_deb_package,
             "debrun": self.run_deb_binary,
-            "run": self.run_python_app,  # <-- Add this line
+            "run": self.run_python_app, 
         }
 
     def set_theme(self, theme):
