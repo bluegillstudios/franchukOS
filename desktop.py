@@ -47,6 +47,15 @@ class Desktop(tk.Tk):
         self.poll_wallpaper_config()
         self.setup_ui()
 
+        self.screensaver_timeout = int(self.config.get("screensaver_timeout", 300))  # seconds
+        self.screensaver_active = False
+        self.last_activity = time.time()
+        self.screensaver_window = None
+        self.bind_all("<Any-KeyPress>", self.reset_screensaver_timer)
+        self.bind_all("<Any-Button>", self.reset_screensaver_timer)
+        self.bind_all("<Motion>", self.reset_screensaver_timer)
+        self.start_screensaver_timer()
+
     def poll_wallpaper_config(self):
         def watcher():
             while True:
@@ -147,6 +156,39 @@ class Desktop(tk.Tk):
 
         self.icons.append(icon_frame)
         self.icon_images.append(icon_photo)  
+
+    def reset_screensaver_timer(self, event=None):
+        self.last_activity = time.time()
+        if self.screensaver_active:
+            self.deactivate_screensaver()
+
+    def start_screensaver_timer(self):
+        def check():
+            while True:
+                if not self.screensaver_active and (time.time() - self.last_activity > self.screensaver_timeout):
+                    self.activate_screensaver()
+                time.sleep(2)
+        threading.Thread(target=check, daemon=True).start()
+
+    def activate_screensaver(self):
+        self.screensaver_active = True
+        self.screensaver_window = tk.Toplevel(self)
+        self.screensaver_window.attributes("-fullscreen", True)
+        self.screensaver_window.configure(bg="black")
+        self.screensaver_window.lift()
+        self.screensaver_window.focus_set()
+        self.screensaver_window.bind("<Any-KeyPress>", self.reset_screensaver_timer)
+        self.screensaver_window.bind("<Any-Button>", self.reset_screensaver_timer)
+        self.screensaver_window.bind("<Motion>", self.reset_screensaver_timer)
+        label = tk.Label(self.screensaver_window, text="Screensaver", fg="white", bg="black", font=("Segoe UI", 48))
+        label.pack(expand=True)
+
+    def deactivate_screensaver(self, event=None):
+        if self.screensaver_window:
+            self.screensaver_window.destroy()
+            self.screensaver_window = None
+        self.screensaver_active = False
+        self.last_activity = time.time()
 
 if __name__ == "__main__":
     desktop = Desktop()
