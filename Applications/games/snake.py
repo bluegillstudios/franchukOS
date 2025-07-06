@@ -19,7 +19,7 @@ def snake_game():
 
     # Set up the display
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("Snake v3.3")
+    pygame.display.set_caption("Snake v3.4")
 
     # Clock for controlling the game's FPS
     clock = pygame.time.Clock()

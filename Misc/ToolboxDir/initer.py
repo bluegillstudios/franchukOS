@@ -2,10 +2,10 @@ import os
 import sys
 
 MODULE_DIRS = [
-    "apps",
-    "gui",
-    "service",
-    "core",
+    "Applications",
+    "Graphics",
+    "Service",
+    "Core",
     "config"
 ]
 

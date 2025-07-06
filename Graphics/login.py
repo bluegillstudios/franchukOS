@@ -1,7 +1,7 @@
 import tkinter as tk
-from tkinter import messagebox, simpledialog, ttk
+from tkinter import messagebox, simpledialog, ttk, filedialog
 from config.manager import load_profiles, save_profiles
-from PIL import Image, ImageTk 
+from PIL import Image, ImageTk  
 from playsound import playsound
 import os
 import pygame
@@ -93,23 +93,41 @@ class LoginApp:
 
     def new_user(self):
         username = simpledialog.askstring("New User", "Enter new username:", parent=self.root)
-        if username is None:
+        if not username:
             return
 
-        users = self.profiles.values() if isinstance(self.profiles, dict) else self.profiles
-        for user in users:
-            if isinstance(user, dict) and user.get("username") == username:
+        # Check for duplicate usernames
+        for user in self.profiles:
+            if user.get("username") == username:
                 messagebox.showerror("Error", "Username already exists!")
-                pygame.mixer.init()
-                pygame.mixer.music.load("assets/sounds/error.wav")
-                pygame.mixer.music.play()
                 return
 
         password = simpledialog.askstring("New User", "Enter new password:", show="*", parent=self.root)
-        if password is None:
+        if not password:
             return
 
-        new_user = {"username": username, "password": password}
+        # Avatar selection
+        avatar_path = filedialog.askopenfilename(
+            title="Select Avatar Image",
+            filetypes=[("Image Files", "*.png;*.jpg;*.jpeg;*.gif")]
+        )
+
+        # Show a preview of the selected avatar
+        if avatar_path:
+            avatar_img = Image.open(avatar_path)
+            avatar_img.thumbnail((64, 64))
+            avatar_preview = ImageTk.PhotoImage(avatar_img)
+            preview_window = tk.Toplevel(self.root)
+            tk.Label(preview_window, image=avatar_preview).pack()
+            tk.Label(preview_window, text="Avatar Preview").pack()
+            preview_window.after(1500, preview_window.destroy)  
+
+        # Save new user with avatar path
+        new_user = {
+            "username": username,
+            "password": password,
+            "avatar_path": avatar_path
+        }
         self.profiles.append(new_user)
         save_profiles(self.profiles)
         messagebox.showinfo("Success", "New user created successfully!")

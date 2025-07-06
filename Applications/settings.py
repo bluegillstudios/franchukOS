@@ -9,7 +9,7 @@ from core.thememanage import apply_theme
 from PIL import Image, ImageTk
 
 
-OS_VERSION = "33.0.0 (Robuna)"
+OS_VERSION = "34.1.6 (Mojave) - Stable"
 
 class SettingsApp:
     def __init__(self):
@@ -172,7 +172,7 @@ class SettingsApp:
             import datetime
             filename = f"screenshot_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
             pyautogui.screenshot(filename)
-            messagebox.showinfo("Screenshot", f"Screenshot saved as {filename}")
+            print(f"Screenshot saved as {filename}")
         except ImportError:
             messagebox.showerror("Error", "pyautogui is not installed.")
 
