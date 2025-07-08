@@ -5,10 +5,11 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QFileDialog, QTabWidget,
     QWidget, QVBoxLayout, QPlainTextEdit, QAction, QMenuBar, QMessageBox,
     QSplitter, QTreeView, QFileSystemModel, QHBoxLayout, QInputDialog, QColorDialog,
-    QDialog, QFormLayout, QPushButton, QDialogButtonBox, QLineEdit, QLabel, QCheckBox
+    QDialog, QFormLayout, QPushButton, QDialogButtonBox, QLineEdit, QLabel, QCheckBox,
+    QTextEdit  
 )
 from PyQt5.QtGui import (
-    QFont, QSyntaxHighlighter, QTextCharFormat, QColor, QTextCursor, QPainter, QPalette, QIcon
+    QFont, QSyntaxHighlighter, QTextCharFormat, QColor, QTextCursor, QPainter, QPalette, QIcon, QTextDocument
 )
 from PyQt5.QtCore import Qt, QTimer, QRegExp, QFileSystemWatcher, QSize
 import sys, os, subprocess
@@ -147,8 +148,10 @@ class CodeEditor(QPlainTextEdit):
         self.cursorPositionChanged.connect(self.highlight_current_line)
         self.setFont(QFont("JetBrains Mono", 13))
         self.update_line_number_area_width(0)
-        self.bracket_pairs = {'(': ')', '{': '}', '[': ']'}
+        self.bracket_pairs = {'(': ')', '{': '}', '[': ']'
+        }
         self.highlight_current_line()
+        self._default_font_size = 13
 
     def line_number_area_width(self):
         digits = len(str(self.blockCount()))
@@ -199,6 +202,24 @@ class CodeEditor(QPlainTextEdit):
             self.moveCursor(QTextCursor.Left)
             return
         super().keyPressEvent(event)
+
+    def wheelEvent(self, event):
+        if event.modifiers() == Qt.ControlModifier:
+            delta = event.angleDelta().y()
+            font = self.font()
+            size = font.pointSize()
+            if delta > 0:
+                size += 1
+            elif delta < 0:
+                size -= 1
+            size = max(6, size)  # Clamp to minimum 6pt
+            font.setPointSize(size)
+            self.setFont(font)
+            self._default_font_size = size
+            self.line_number_area.editor.setFont(font)
+            self.update_line_number_area_width(0)
+        else:
+            super().wheelEvent(event)
 
 class EditorTab(QWidget):
     def __init__(self):
@@ -312,9 +333,9 @@ class SearchReplaceDialog(QDialog):
 class Birdseye(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Birdseye v3.1.142")
+        self.setWindowTitle("Birdseye v5.1")
         self.setGeometry(100, 100, 1280, 800)
-        self.setWindowIcon(QIcon())  # Add your icon path here if available
+        self.setWindowIcon(QIcon()) 
 
         # File tree
         self.file_model = QFileSystemModel()
@@ -444,7 +465,7 @@ class Birdseye(QMainWindow):
         QMessageBox.about(
             self,
             "About Birdseye",
-            "<b>Birdseye v5.0.461.4</b><br>"
+            "<b>Birdseye v5.1.644.92</b><br>"
             "A simple multi-language code editor for FranchukOS.<br><br>"
             "Copyright 2025 the FranchukOS project authors.<br>"
             "Licensed under the Apache License, Version 2.0.<br><br>"
@@ -844,6 +865,13 @@ class Birdseye(QMainWindow):
         lines = text.count('\n') + 1
         words = len(text.split())
         self.statusBar().showMessage(f"Lines: {lines} | Words: {words}")
+
+    def open_search_replace(self):
+        editor = self.tabs.currentWidget()
+        if not editor:
+            return
+        dlg = SearchReplaceDialog(self, editor.text_edit)
+        dlg.exec_()
 
 def main():
     app = QApplication(sys.argv)

@@ -1,3 +1,6 @@
+# Copyright 2025 the Franchuk project authors.
+
+
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk, filedialog
 from config.manager import load_profiles, save_profiles
