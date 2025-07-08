@@ -128,7 +128,7 @@ class Terminal(tk.Toplevel):
             "arch": self.show_architecture,
             "python": self.run_python_interpreter,
             "help": self.show_help,
-            "version": lambda args: "FranchukOS version 34.1.6 (codenamed Mojave). Terminal version v1.1.4.",
+            "version": lambda args: "FranchukOS version 34.2.9 (codenamed Mojave). Terminal version v1.1.4.",
             "rename": self.rename_file,
             "theme": self.set_theme_command,
             "debinstall": self.install_deb_package,
