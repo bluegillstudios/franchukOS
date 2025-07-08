@@ -186,8 +186,7 @@ class FrannyBrowser(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Franny (v18.0.77)")
-        self.setGeometry(100, 100, 1024, 768)
+        self.setWindowTitle("Franny (v18.2.11)")  
 
         self.tabs = QTabWidget(self)
         self.tabs.setTabsClosable(True)
@@ -233,6 +232,8 @@ class FrannyBrowser(QMainWindow):
         self.closed_tabs = []  # Stack for closed tabs
         self.tab_groups = {}  # tab index -> group name
         self.group_colors = {}  # group name -> color
+
+        self.minimalist_mode = False  # Minimalist mode state
 
         self.init_toolbar()
         self.init_menu()
@@ -315,7 +316,9 @@ class FrannyBrowser(QMainWindow):
 
     def init_menu(self):
         menu_bar = self.menuBar()
-        file_menu = menu_bar.addMenu("Options")
+
+        
+        file_menu = menu_bar.addMenu("Tabs and Modes")
         new_tab_action = QAction("New Tab", self)
         new_tab_action.triggered.connect(self.new_tab)
         file_menu.addAction(new_tab_action)
@@ -329,38 +332,6 @@ class FrannyBrowser(QMainWindow):
         incognito_action.triggered.connect(self.toggle_incognito)
         file_menu.addAction(incognito_action)
 
-        add_bookmark_action = QAction("Add Bookmark", self)
-        add_bookmark_action.triggered.connect(self.add_bookmark)
-        file_menu.addAction(add_bookmark_action)
-
-        import_bookmarks_action = QAction("Import Bookmarks", self)
-        import_bookmarks_action.triggered.connect(self.import_bookmarks)
-        file_menu.addAction(import_bookmarks_action)
-
-        export_bookmarks_action = QAction("Export Bookmarks", self)
-        export_bookmarks_action.triggered.connect(self.export_bookmarks)
-        file_menu.addAction(export_bookmarks_action)
-
-        clear_data_action = QAction("Clear Data", self)
-        clear_data_action.triggered.connect(self.clear_data)
-        file_menu.addAction(clear_data_action)
-
-        zoom_in_action = QAction("Zoom In", self)
-        zoom_in_action.triggered.connect(self.zoom_in)
-        file_menu.addAction(zoom_in_action)
-
-        zoom_out_action = QAction("Zoom Out", self)
-        zoom_out_action.triggered.connect(self.zoom_out)
-        file_menu.addAction(zoom_out_action)
-
-        find_in_page_action = QAction("Find in Page", self)
-        find_in_page_action.triggered.connect(self.find_in_page)
-        file_menu.addAction(find_in_page_action)
-
-        download_manager_action = QAction("Download Manager", self)
-        download_manager_action.triggered.connect(self.show_download_manager)
-        file_menu.addAction(download_manager_action)
-
         save_pdf_action = QAction("Save as PDF", self)
         save_pdf_action.triggered.connect(self.save_as_pdf)
         file_menu.addAction(save_pdf_action)
@@ -369,15 +340,69 @@ class FrannyBrowser(QMainWindow):
         settings_action.triggered.connect(self.show_settings)
         file_menu.addAction(settings_action)
 
+        file_menu.addSeparator()
+        clear_data_action = QAction("Clear Data", self)
+        clear_data_action.triggered.connect(self.clear_data)
+        file_menu.addAction(clear_data_action)
+
+        # View menu
+        view_menu = menu_bar.addMenu("View")
+        zoom_in_action = QAction("Zoom In", self)
+        zoom_in_action.triggered.connect(self.zoom_in)
+        view_menu.addAction(zoom_in_action)
+
+        zoom_out_action = QAction("Zoom Out", self)
+        zoom_out_action.triggered.connect(self.zoom_out)
+        view_menu.addAction(zoom_out_action)
+
+        find_in_page_action = QAction("Find in Page", self)
+        find_in_page_action.triggered.connect(self.find_in_page)
+        view_menu.addAction(find_in_page_action)
+
         devtools_action = QAction("Open DevTools", self)
         devtools_action.setShortcut("F12")
         devtools_action.triggered.connect(lambda: self.current_browser().show_devtools())
-        file_menu.addAction(devtools_action)
+        view_menu.addAction(devtools_action)
 
-        bookmark_menu = menu_bar.addMenu("Bookmarks")
-        self.bookmarks_action = QAction("Bookmarks", self)
+        minimalist_toggle_action = QAction("Toggle Minimalist Mode", self)
+        minimalist_toggle_action.triggered.connect(self.toggle_minimalist_mode)
+        view_menu.addAction(minimalist_toggle_action)
+
+        resource_viewer_action = QAction("Site Resource Viewer", self)
+        resource_viewer_action.triggered.connect(self.show_resource_viewer)
+        view_menu.addAction(resource_viewer_action)
+
+        # Bookmarks menu
+        bookmarks_menu = menu_bar.addMenu("Bookmarks")
+        add_bookmark_action = QAction("Add Bookmark", self)
+        add_bookmark_action.triggered.connect(self.add_bookmark)
+        bookmarks_menu.addAction(add_bookmark_action)
+
+        import_bookmarks_action = QAction("Import Bookmarks", self)
+        import_bookmarks_action.triggered.connect(self.import_bookmarks)
+        bookmarks_menu.addAction(import_bookmarks_action)
+
+        export_bookmarks_action = QAction("Export Bookmarks", self)
+        export_bookmarks_action.triggered.connect(self.export_bookmarks)
+        bookmarks_menu.addAction(export_bookmarks_action)
+
+        self.bookmarks_action = QAction("Show Bookmarks", self)
         self.bookmarks_action.triggered.connect(self.show_bookmarks)
-        bookmark_menu.addAction(self.bookmarks_action)
+        bookmarks_menu.addAction(self.bookmarks_action)
+
+        # Tools menu
+        tools_menu = menu_bar.addMenu("Tools")
+        download_manager_action = QAction("Download Manager", self)
+        download_manager_action.triggered.connect(self.show_download_manager)
+        tools_menu.addAction(download_manager_action)
+
+        minimalist_toggle_action = QAction("Toggle Minimalist Mode", self)
+        minimalist_toggle_action.triggered.connect(self.toggle_minimalist_mode)
+        file_menu.addAction(minimalist_toggle_action)
+
+        resource_viewer_action = QAction("Site Resource Viewer", self)
+        resource_viewer_action.triggered.connect(self.show_resource_viewer)
+        file_menu.addAction(resource_viewer_action)
 
     def init_bookmarks_bar(self):
         self.bookmarks_bar = QToolBar("Bookmarks Bar", self)
@@ -801,6 +826,47 @@ class FrannyBrowser(QMainWindow):
         dialog.setLayout(layout)
         update_results()
         dialog.exec_()
+
+    def toggle_minimalist_mode(self):
+        self.minimalist_mode = not self.minimalist_mode
+        self.menuBar().setVisible(not self.minimalist_mode)
+        self.toolbar.setVisible(not self.minimalist_mode)
+        self.bookmarks_bar.setVisible(not self.minimalist_mode)
+        self.statusBar().setVisible(not self.minimalist_mode)
+        self.status_bar.showMessage("Minimalist Mode {}".format("Enabled" if self.minimalist_mode else "Disabled"))
+
+    def show_resource_viewer(self):
+        browser = self.current_browser()
+        if not browser:
+            return
+
+        page = browser.page()
+        profile = page.profile()
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Site Resource Viewer")
+        layout = QVBoxLayout()
+
+        list_widget = QListWidget()
+        layout.addWidget(list_widget)
+
+        def on_request_intercepted(info):
+            list_widget.addItem(info.requestUrl().toString())
+
+        class ResourceInterceptor(QWebEngineUrlRequestInterceptor):
+            def interceptRequest(self, info):
+                on_request_intercepted(info)
+
+        # Attach new interceptor
+        self._resource_interceptor = ResourceInterceptor()
+        profile.setRequestInterceptor(self._resource_interceptor)
+
+        dialog.setLayout(layout)
+        dialog.resize(600, 400)
+        dialog.exec_()
+
+        # Reset interceptor to avoid global capture
+        profile.setRequestInterceptor(None)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
