@@ -53,7 +53,7 @@ class Terminal(tk.Toplevel):
                             font=("Consolas", 11), undo=True, wrap="word",
                             borderwidth=0, highlightthickness=0, padx=10, pady=10)
         self.text.pack(fill="both", expand=True, padx=10, pady=10)
-        self.text.insert("end", "Welcome to the FranchukOS Terminal, v1.1.0\n")
+        self.text.insert("end", "Welcome to the FranchukOS Terminal, v1.2.5\n")
         self.text.insert("end", "If you got here by mistake, it's ok! Just close this tab and carry on.\n")
         self.text.insert("end", self.PROMPT, "prompt")
         self.text.tag_configure("prompt", foreground=self.THEMES[theme]["prompt_fg"])
@@ -95,7 +95,7 @@ class Terminal(tk.Toplevel):
             "arch": self.show_architecture,
             "python": self.run_python_interpreter,
             "help": self.show_help,
-            "version": lambda args: "FranchukOS version 34.2.9 (codenamed Mojave). Terminal version v1.1.4.",
+            "version": lambda args: "FranchukOS version 35.0.0 (codenamed Catalina). Terminal version v1.2.5.",
             "rename": self.rename_file,
             "theme": self.set_theme_command,
             "debinstall": self.install_deb_package,
