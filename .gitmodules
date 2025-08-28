@@ -1,0 +1,3 @@
+[submodule "fsl"]
+	path = fsl
+	url = https://github.com/bluegillstudios/fsl/

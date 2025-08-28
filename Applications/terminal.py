@@ -17,59 +17,26 @@ import tarfile
 import ar
 import tempfile
 import subprocess
+import threading
+
+# --- FSL Integration ---
+from fsl import core as fsl_core
+from fsl import manager as fsl_manager
+from fsl import shell as fsl_shell
+
 
 class Terminal(tk.Toplevel):
     PROMPT = ">>> "
 
     THEMES = {
-        "Dark": {
-            "bg": "#1e1e1e",
-            "fg": "#00ff00",
-            "insertbackground": "white",
-            "prompt_fg": "#00ff00",
-        },
-        "Light": {
-            "bg": "#f8f8f8",
-            "fg": "#222222",
-            "insertbackground": "black",
-            "prompt_fg": "#0055aa",
-        },
-        "Solarized": {
-            "bg": "#002b36",
-            "fg": "#839496",
-            "insertbackground": "#93a1a1",
-            "prompt_fg": "#b58900",
-        },
-        "Monokai": {
-            "bg": "#272822",
-            "fg": "#f8f8f2",
-            "insertbackground": "#f8f8f0",
-            "prompt_fg": "#a6e22e",
-        },
-        "Gruvbox": {
-            "bg": "#282828",
-            "fg": "#ebdbb2",
-            "insertbackground": "#fbf1c7",
-            "prompt_fg": "#fabd2f",
-        },
-        "Dracula": {
-            "bg": "#282a36",
-            "fg": "#f8f8f2",
-            "insertbackground": "#f8f8f2",
-            "prompt_fg": "#bd93f9",
-        },
-        "Nord": {
-            "bg": "#2e3440",
-            "fg": "#d8dee9",
-            "insertbackground": "#eceff4",
-            "prompt_fg": "#88c0d0",
-        },
-        "High Contrast": {
-            "bg": "#000000",
-            "fg": "#ffffff",
-            "insertbackground": "#ffffff",
-            "prompt_fg": "#ffff00",
-        }
+        "Dark": {"bg": "#1e1e1e", "fg": "#00ff00", "insertbackground": "white", "prompt_fg": "#00ff00"},
+        "Light": {"bg": "#f8f8f8", "fg": "#222222", "insertbackground": "black", "prompt_fg": "#0055aa"},
+        "Solarized": {"bg": "#002b36", "fg": "#839496", "insertbackground": "#93a1a1", "prompt_fg": "#b58900"},
+        "Monokai": {"bg": "#272822", "fg": "#f8f8f2", "insertbackground": "#f8f8f0", "prompt_fg": "#a6e22e"},
+        "Gruvbox": {"bg": "#282828", "fg": "#ebdbb2", "insertbackground": "#fbf1c7", "prompt_fg": "#fabd2f"},
+        "Dracula": {"bg": "#282a36", "fg": "#f8f8f2", "insertbackground": "#f8f8f2", "prompt_fg": "#bd93f9"},
+        "Nord": {"bg": "#2e3440", "fg": "#d8dee9", "insertbackground": "#eceff4", "prompt_fg": "#88c0d0"},
+        "High Contrast": {"bg": "#000000", "fg": "#ffffff", "insertbackground": "#ffffff", "prompt_fg": "#ffff00"}
     }
 
     def __init__(self, master=None, theme="Dark"):
@@ -86,7 +53,7 @@ class Terminal(tk.Toplevel):
                             font=("Consolas", 11), undo=True, wrap="word",
                             borderwidth=0, highlightthickness=0, padx=10, pady=10)
         self.text.pack(fill="both", expand=True, padx=10, pady=10)
-        self.text.insert("end", "Welcome to the FranchukOS Terminal, v1.1.0\n")
+        self.text.insert("end", "Welcome to the FranchukOS Terminal, v1.2.5\n")
         self.text.insert("end", "If you got here by mistake, it's ok! Just close this tab and carry on.\n")
         self.text.insert("end", self.PROMPT, "prompt")
         self.text.tag_configure("prompt", foreground=self.THEMES[theme]["prompt_fg"])
@@ -128,14 +95,17 @@ class Terminal(tk.Toplevel):
             "arch": self.show_architecture,
             "python": self.run_python_interpreter,
             "help": self.show_help,
-            "version": lambda args: "FranchukOS version 34.2.9 (codenamed Mojave). Terminal version v1.1.4.",
+            "version": lambda args: "FranchukOS version 35.0.0 (codenamed Catalina). Terminal version v1.2.5.",
             "rename": self.rename_file,
             "theme": self.set_theme_command,
             "debinstall": self.install_deb_package,
             "debrun": self.run_deb_binary,
-            "run": self.run_python_app, 
+            "run": self.run_python_app,
+            # --- FSL command integration ---
+            "fsl": self.run_fsl_command,
         }
 
+    # --- Theme handling ---
     def set_theme(self, theme):
         if theme not in self.THEMES:
             return
@@ -152,11 +122,10 @@ class Terminal(tk.Toplevel):
         self.set_theme(args[0])
         return f"Theme set to {args[0]}"
 
+    # --- Input handling ---
     def handle_enter(self, event=None):
-        # Get the current line (from the prompt onwards)
         index = self.text.index("insert linestart")
         line = self.text.get(index, "insert lineend")
-        # Only the part after the prompt
         if line.startswith(self.PROMPT):
             code_line = line[len(self.PROMPT):].strip()
         else:
@@ -168,7 +137,6 @@ class Terminal(tk.Toplevel):
         output = self.run_code(code_line)
         if output:
             self.text.insert("end", output.strip() + "\n")
-        # Insert prompt with color
         self.text.insert("end", self.PROMPT, "prompt")
         self.text.see("end")
         return "break"
@@ -188,18 +156,17 @@ class Terminal(tk.Toplevel):
         return "break"
 
     def replace_current_line(self, text):
-        # Delete everything after the prompt on the current line, then insert
         line_start = self.text.index("insert linestart")
         prompt_len = len(self.PROMPT)
         self.text.delete(f"{line_start}+{prompt_len}c", f"{line_start} lineend")
         self.text.insert(f"{line_start}+{prompt_len}c", text)
 
+    # --- Command dispatcher ---
     def run_code(self, code_line):
         if not code_line:
             return ""
         parts = code_line.split()
         cmd, args = parts[0], parts[1:]
-
         if cmd in self.commands:
             try:
                 result = self.commands[cmd](args)
@@ -207,7 +174,6 @@ class Terminal(tk.Toplevel):
             except Exception as e:
                 return f"Error: {str(e)}"
         else:
-            # Fallback: try to execute as python code
             stdout = sys.stdout
             sys.stdout = buffer = io.StringIO()
             try:
@@ -217,17 +183,17 @@ class Terminal(tk.Toplevel):
             sys.stdout = stdout
             return buffer.getvalue()
 
+    # --- File and system commands ---
     def list_files(self, args):
         try:
             path = args[0] if args else os.getcwd()
-            files = os.listdir(path)
-            return "\n".join(files)
+            return "\n".join(os.listdir(path))
         except Exception as e:
             return f"Error: {str(e)}"
 
     def clear_terminal(self, args):
         self.text.delete(1.0, "end")
-        
+
     def quit_terminal(self, args):
         self.destroy()
         return ""
@@ -352,7 +318,6 @@ class Terminal(tk.Toplevel):
 
     def show_ip_address(self, args):
         try:
-            # Cross-platform: fallback to socket if popen fails
             ip = os.popen('hostname -I').read().strip()
             if not ip:
                 import socket
@@ -364,8 +329,41 @@ class Terminal(tk.Toplevel):
     def show_architecture(self, args):
         return platform.machine()
 
+    # --- Python commands ---
     def run_python_interpreter(self, args):
-        return "Python interactive interpreter not supported in this shell. Please type Python code directly."
+        self.text.insert("end", "\nEntering Python interactive interpreter. Type 'exit()' to leave.\n")
+        self.text.insert("end", ">>> ", "prompt")
+        self.text.see("end")
+        buffer = ""
+        while True:
+            self.text.mark_set("insert", "end")
+            self.text.focus_set()
+            self.wait_variable(tk.BooleanVar())
+            index = self.text.index("insert linestart")
+            line = self.text.get(index, "insert lineend")
+            if line.startswith(self.PROMPT):
+                code_line = line[len(self.PROMPT):].strip()
+            else:
+                code_line = line.strip()
+            self.text.insert("end", "\n")
+            if code_line == "exit()":
+                self.text.insert("end", "Leaving Python interpreter.\n")
+                self.text.insert("end", self.PROMPT, "prompt")
+                self.text.see("end")
+                break
+            stdout = sys.stdout
+            sys.stdout = buffer_io = io.StringIO()
+            try:
+                self.interpreter.runsource(code_line)
+            except Exception as e:
+                print(e)
+            sys.stdout = stdout
+            output = buffer_io.getvalue()
+            if output:
+                self.text.insert("end", output)
+            self.text.insert("end", ">>> ", "prompt")
+            self.text.see("end")
+        return ""
 
     def show_help(self, args):
         return "Supported commands:\n" + ", ".join(sorted(self.commands.keys()))
@@ -379,6 +377,7 @@ class Terminal(tk.Toplevel):
         except Exception as e:
             return f"Error: {str(e)}"
 
+    # --- DEB package support ---
     def install_deb_package(self, args):
         if not args:
             return "Usage: debinstall <path-to-deb> [appname]"
@@ -426,10 +425,6 @@ class Terminal(tk.Toplevel):
             return f"Error running binary: {e}"
 
     def run_python_app(self, args):
-        """
-        Run a Python application from the terminal.
-        Usage: run <script.py> [args...]
-        """
         if not args:
             return "Usage: run <script.py> [args...]"
         script = args[0]
@@ -441,7 +436,6 @@ class Terminal(tk.Toplevel):
             sys.argv = [script] + script_args
             with open(script, "r") as f:
                 code_str = f.read()
-            # Use a new globals dict for script execution
             script_globals = {"__name__": "__main__", "__file__": script}
             exec(compile(code_str, script, "exec"), script_globals)
             sys.argv = old_argv
@@ -449,3 +443,38 @@ class Terminal(tk.Toplevel):
         except Exception as e:
             sys.argv = old_argv
             return f"Error running {script}: {e}"
+
+    # --- FSL integration ---
+    def run_fsl_command(self, args):
+        if not args:
+            return "Usage: fsl <list|install|run> [distro_name]"
+
+        cmd = args[0]
+        cmd_args = args[1:] if len(args) > 1 else []
+
+        buffer = io.StringIO()
+        stdout = sys.stdout
+        sys.stdout = buffer
+        try:
+            if cmd == "list":
+                fsl_manager.list_distros()
+            elif cmd == "install":
+                if not cmd_args:
+                    print("Specify a distro to install.")
+                else:
+                    fsl_manager.install_distro(cmd_args[0])
+            elif cmd == "run":
+                if not cmd_args:
+                    print("Specify a distro to run.")
+                else:
+                    distro_name = cmd_args[0]
+                    t = threading.Thread(target=fsl_shell.run_distro, args=(distro_name,))
+                    t.start()
+                    print(f"Launching {distro_name}...")
+            else:
+                print("Unknown fsl command. Available: list, install, run")
+        except Exception as e:
+            print(f"FSL error: {str(e)}")
+        finally:
+            sys.stdout = stdout
+        return buffer.getvalue()

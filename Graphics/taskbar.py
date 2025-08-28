@@ -211,6 +211,7 @@ class Taskbar(tk.Frame):
         creative_menu.add_command(label="Franpaint", command=self.launch_franpaint)
         creative_menu.add_command(label="Insider", command=self.launch_insider)
         creative_menu.add_command(label="Outsider", command=self.launch_outsider)
+        creative_menu.add_command(label="Tempo", command=self.launch_tempo)
         menu.add_cascade(label="Creative", menu=creative_menu)
 
         # Games submenu
@@ -329,6 +330,12 @@ class Taskbar(tk.Frame):
             subprocess.Popen([sys.executable, "Applications/notetaking.py"])
         except Exception as e:
             print(f"Failed to launch Note: {e}")
+    def launch_tempo(self):
+        try:
+            subprocess.Popen([sys.executable, "Applications/tempo.py"])
+        except Exception as e:
+            print(f"Failed to launch Tempo: {e}")
+
 if __name__ == "__main__":
     taskbar = Taskbar()
     taskbar.mainloop()
