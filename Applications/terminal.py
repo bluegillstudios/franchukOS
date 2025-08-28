@@ -452,22 +452,29 @@ class Terminal(tk.Toplevel):
         cmd = args[0]
         cmd_args = args[1:] if len(args) > 1 else []
 
+        buffer = io.StringIO()
+        stdout = sys.stdout
+        sys.stdout = buffer
         try:
             if cmd == "list":
-                return fsl_manager.list_distros()
+                fsl_manager.list_distros()
             elif cmd == "install":
                 if not cmd_args:
-                    return "Specify a distro to install."
-                fsl_manager.install_distro(cmd_args[0])
-                return f"{cmd_args[0]} installed successfully."
+                    print("Specify a distro to install.")
+                else:
+                    fsl_manager.install_distro(cmd_args[0])
             elif cmd == "run":
                 if not cmd_args:
-                    return "Specify a distro to run."
-                distro_name = cmd_args[0]
-                t = threading.Thread(target=fsl_shell.run_distro, args=(distro_name,))
-                t.start()
-                return f"Launching {distro_name}..."
+                    print("Specify a distro to run.")
+                else:
+                    distro_name = cmd_args[0]
+                    t = threading.Thread(target=fsl_shell.run_distro, args=(distro_name,))
+                    t.start()
+                    print(f"Launching {distro_name}...")
             else:
-                return "Unknown fsl command. Available: list, install, run"
+                print("Unknown fsl command. Available: list, install, run")
         except Exception as e:
-            return f"FSL error: {str(e)}"
+            print(f"FSL error: {str(e)}")
+        finally:
+            sys.stdout = stdout
+        return buffer.getvalue()
