@@ -5,10 +5,11 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QFileDialog, QTabWidget,
     QWidget, QVBoxLayout, QPlainTextEdit, QAction, QMenuBar, QMessageBox,
     QSplitter, QTreeView, QFileSystemModel, QHBoxLayout, QInputDialog, QColorDialog,
-    QDialog, QFormLayout, QPushButton, QDialogButtonBox
+    QDialog, QFormLayout, QPushButton, QDialogButtonBox, QLineEdit, QLabel, QCheckBox,
+    QTextEdit  
 )
 from PyQt5.QtGui import (
-    QFont, QSyntaxHighlighter, QTextCharFormat, QColor, QTextCursor, QPainter, QPalette, QIcon
+    QFont, QSyntaxHighlighter, QTextCharFormat, QColor, QTextCursor, QPainter, QPalette, QIcon, QTextDocument
 )
 from PyQt5.QtCore import Qt, QTimer, QRegExp, QFileSystemWatcher, QSize
 import sys, os, subprocess
@@ -74,7 +75,18 @@ class CodeHighlighter(QSyntaxHighlighter):
             'package', 'protected', 'static', 'interface', 'private', 'public'
         ]
 
-        all_keywords = set(cpp_keywords + csharp_keywords + python_keywords + rust_keywords + javascript_keywords)
+        java_keywords = [
+            'abstract', 'assert', 'boolean', 'break', 'byte', 'case', 'catch', 'char', 'class', 'const',
+            'continue', 'default', 'do', 'double', 'else', 'enum', 'extends', 'final', 'finally', 'float',
+            'for', 'goto', 'if', 'implements', 'import', 'instanceof', 'int', 'interface', 'long', 'native',
+            'new', 'package', 'private', 'protected', 'public', 'return', 'short', 'static', 'strictfp',
+            'super', 'switch', 'synchronized', 'this', 'throw', 'throws', 'transient', 'try', 'void',
+            'volatile', 'while', 'true', 'false', 'null'
+        ]
+
+        all_keywords = set(
+            cpp_keywords + csharp_keywords + python_keywords + rust_keywords + javascript_keywords + java_keywords
+        )
         self.highlighting_rules += [(QRegExp(r'\b' + kw + r'\b'), keyword_format) for kw in all_keywords]
 
         # Types
@@ -136,8 +148,10 @@ class CodeEditor(QPlainTextEdit):
         self.cursorPositionChanged.connect(self.highlight_current_line)
         self.setFont(QFont("JetBrains Mono", 13))
         self.update_line_number_area_width(0)
-        self.bracket_pairs = {'(': ')', '{': '}', '[': ']'}
+        self.bracket_pairs = {'(': ')', '{': '}', '[': ']'
+        }
         self.highlight_current_line()
+        self._default_font_size = 13
 
     def line_number_area_width(self):
         digits = len(str(self.blockCount()))
@@ -188,6 +202,24 @@ class CodeEditor(QPlainTextEdit):
             self.moveCursor(QTextCursor.Left)
             return
         super().keyPressEvent(event)
+
+    def wheelEvent(self, event):
+        if event.modifiers() == Qt.ControlModifier:
+            delta = event.angleDelta().y()
+            font = self.font()
+            size = font.pointSize()
+            if delta > 0:
+                size += 1
+            elif delta < 0:
+                size -= 1
+            size = max(6, size)  # Clamp to minimum 6pt
+            font.setPointSize(size)
+            self.setFont(font)
+            self._default_font_size = size
+            self.line_number_area.editor.setFont(font)
+            self.update_line_number_area_width(0)
+        else:
+            super().wheelEvent(event)
 
 class EditorTab(QWidget):
     def __init__(self):
@@ -246,12 +278,64 @@ class ThemeEditorDialog(QDialog):
     def get_theme(self):
         return self.colors
 
+class SearchReplaceDialog(QDialog):
+    def __init__(self, parent, editor):
+        super().__init__(parent)
+        self.setWindowTitle("Search and Replace")
+        self.editor = editor
+        layout = QFormLayout(self)
+        self.search_input = QLineEdit()
+        self.replace_input = QLineEdit()
+        self.case_checkbox = QCheckBox("Case sensitive")
+        layout.addRow("Find:", self.search_input)
+        layout.addRow("Replace with:", self.replace_input)
+        layout.addRow(self.case_checkbox)
+        btns = QDialogButtonBox(QDialogButtonBox.Find | QDialogButtonBox.Replace | QDialogButtonBox.ReplaceAll | QDialogButtonBox.Close)
+        btns.button(QDialogButtonBox.Find).clicked.connect(self.find_next)
+        btns.button(QDialogButtonBox.Replace).clicked.connect(self.replace_one)
+        btns.button(QDialogButtonBox.ReplaceAll).clicked.connect(self.replace_all)
+        btns.rejected.connect(self.reject)
+        layout.addRow(btns)
+
+    def find_next(self):
+        text = self.search_input.text()
+        flags = QTextDocument.FindFlags()
+        if self.case_checkbox.isChecked():
+            flags |= QTextDocument.FindCaseSensitively
+        found = self.editor.find(text, flags)
+        if not found:
+            QMessageBox.information(self, "Search", "No more matches found.")
+
+    def replace_one(self):
+        cursor = self.editor.textCursor()
+        if cursor.hasSelection():
+            cursor.insertText(self.replace_input.text())
+            self.find_next()
+        else:
+            self.find_next()
+
+    def replace_all(self):
+        search = self.search_input.text()
+        replace = self.replace_input.text()
+        if not search:
+            return
+        text = self.editor.toPlainText()
+        if self.case_checkbox.isChecked():
+            count = text.count(search)
+            new_text = text.replace(search, replace)
+        else:
+            import re
+            count = len(re.findall(re.escape(search), text, re.IGNORECASE))
+            new_text = re.sub(re.escape(search), replace, text, flags=re.IGNORECASE)
+        self.editor.setPlainText(new_text)
+        QMessageBox.information(self, "Replace All", f"Replaced {count} occurrence(s).")
+
 class Birdseye(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Birdseye v3.1.142")
+        self.setWindowTitle("Birdseye v5.1")
         self.setGeometry(100, 100, 1280, 800)
-        self.setWindowIcon(QIcon())  # Add your icon path here if available
+        self.setWindowIcon(QIcon()) 
 
         # File tree
         self.file_model = QFileSystemModel()
@@ -284,6 +368,8 @@ class Birdseye(QMainWindow):
         # Status bar styling
         self.statusBar().setStyleSheet("color: #aaa; font-size: 12px;")
 
+        self.recent_files = []
+
         self.init_menu()
         self.autosave_timer = QTimer()
         self.autosave_timer.timeout.connect(self.autosave_all)
@@ -308,6 +394,11 @@ class Birdseye(QMainWindow):
         file_menu = menu.addMenu("File")
         view_menu = menu.addMenu("View")
         project_menu = menu.addMenu("Project")
+        edit_menu = menu.addMenu("Edit")
+        search_action = QAction("Search/Replace", self)
+        search_action.setShortcut("Ctrl+F")
+        search_action.triggered.connect(self.open_search_replace)
+        edit_menu.addAction(search_action)
 
         new_action = QAction("New", self)
         new_action.triggered.connect(self.new_tab)
@@ -335,7 +426,7 @@ class Birdseye(QMainWindow):
 
         # Language selection
         lang_menu = menu.addMenu("Language")
-        for lang in ["Auto", "Python", "C++", "C#", "Rust", "JavaScript", "Plain Text"]:
+        for lang in ["Auto", "Python", "C++", "C#", "Rust", "JavaScript", "Java", "Plain Text"]:
             action = QAction(lang, self)
             action.triggered.connect(lambda _, l=lang: self.set_language(l))
             lang_menu.addAction(action)
@@ -365,11 +456,16 @@ class Birdseye(QMainWindow):
         about_action.triggered.connect(self.show_about_dialog)
         help_menu.addAction(about_action)
 
+        # Recent files menu
+        recent_menu = menu.addMenu("Recent")
+        self.recent_menu = recent_menu
+        self.update_recent_menu()
+
     def show_about_dialog(self):
         QMessageBox.about(
             self,
             "About Birdseye",
-            "<b>Birdseye v3.1.142</b><br>"
+            "<b>Birdseye v5.1.644.92</b><br>"
             "A simple multi-language code editor for FranchukOS.<br><br>"
             "Copyright 2025 the FranchukOS project authors.<br>"
             "Licensed under the Apache License, Version 2.0.<br><br>"
@@ -393,6 +489,8 @@ class Birdseye(QMainWindow):
                     lang = "Rust"
                 elif ext in [".js", ".jsx", ".mjs"]:
                     lang = "JavaScript"
+                elif ext in [".java"]:
+                    lang = "Java"
                 else:
                     lang = "Plain Text"
             else:
@@ -440,6 +538,15 @@ class Birdseye(QMainWindow):
                 'return', 'super', 'switch', 'this', 'throw', 'try', 'typeof', 'var',
                 'void', 'while', 'with', 'yield', 'enum', 'await', 'implements',
                 'package', 'protected', 'static', 'interface', 'private', 'public'
+            ]
+        elif lang == "Java":
+            keywords = [
+                'abstract', 'assert', 'boolean', 'break', 'byte', 'case', 'catch', 'char', 'class', 'const',
+                'continue', 'default', 'do', 'double', 'else', 'enum', 'extends', 'final', 'finally', 'float',
+                'for', 'goto', 'if', 'implements', 'import', 'instanceof', 'int', 'interface', 'long', 'native',
+                'new', 'package', 'private', 'protected', 'public', 'return', 'short', 'static', 'strictfp',
+                'super', 'switch', 'synchronized', 'this', 'throw', 'throws', 'transient', 'try', 'void',
+                'volatile', 'while', 'true', 'false', 'null'
             ]
         else:
             keywords = []
@@ -496,6 +603,9 @@ class Birdseye(QMainWindow):
             self.tabs.setCurrentWidget(editor_tab)
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Could not open file:\n{e}")
+        if path not in self.recent_files:
+            self.recent_files.insert(0, path)
+            self.recent_files = self.recent_files[:10]
 
     def open_from_tree(self, index):
         path = self.file_model.filePath(index)
@@ -699,6 +809,69 @@ class Birdseye(QMainWindow):
     def apply_custom_theme(self):
         # i'm too fucking tired to write shit right now, so this is a placeholder
         pass
+
+    def run_current_file(self):
+        editor = self.tabs.currentWidget()
+        if not editor or not editor.file_path:
+            QMessageBox.information(self, "Run", "Save the file before running.")
+            return
+        ext = os.path.splitext(editor.file_path)[1].lower()
+        cmd = None
+        if ext == ".py":
+            cmd = ["python", editor.file_path]
+        elif ext == ".java":
+            # Compile then run
+            dir_path = os.path.dirname(editor.file_path)
+            base = os.path.splitext(os.path.basename(editor.file_path))[0]
+            compile_cmd = ["javac", editor.file_path]
+            run_cmd = ["java", "-cp", dir_path, base]
+            try:
+                subprocess.check_call(compile_cmd)
+                cmd = run_cmd
+            except Exception as e:
+                QMessageBox.warning(self, "Run", f"Java compilation failed:\n{e}")
+                return
+        elif ext in [".cpp", ".cxx", ".cc"]:
+            exe_path = os.path.splitext(editor.file_path)[0] + ".exe"
+            compile_cmd = ["g++", editor.file_path, "-o", exe_path]
+            try:
+                subprocess.check_call(compile_cmd)
+                cmd = [exe_path]
+            except Exception as e:
+                QMessageBox.warning(self, "Run", f"C++ compilation failed:\n{e}")
+                return
+        else:
+            QMessageBox.information(self, "Run", "Running is only supported for Python, Java, and C++ files.")
+            return
+        try:
+            output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, universal_newlines=True)
+            QMessageBox.information(self, "Run Output", output)
+        except Exception as e:
+            QMessageBox.warning(self, "Run", f"Run failed:\n{e}")
+
+    def update_recent_menu(self):
+        self.recent_menu.clear()
+        for path in self.recent_files:
+            action = QAction(path, self)
+            action.triggered.connect(lambda _, p=path: self.open_path(p))
+            self.recent_menu.addAction(action)
+
+    def update_status_bar(self):
+        editor = self.tabs.currentWidget()
+        if not editor:
+            self.statusBar().clearMessage()
+            return
+        text = editor.text_edit.toPlainText()
+        lines = text.count('\n') + 1
+        words = len(text.split())
+        self.statusBar().showMessage(f"Lines: {lines} | Words: {words}")
+
+    def open_search_replace(self):
+        editor = self.tabs.currentWidget()
+        if not editor:
+            return
+        dlg = SearchReplaceDialog(self, editor.text_edit)
+        dlg.exec_()
 
 def main():
     app = QApplication(sys.argv)

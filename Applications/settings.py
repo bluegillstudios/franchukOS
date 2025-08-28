@@ -9,7 +9,7 @@ from core.thememanage import apply_theme
 from PIL import Image, ImageTk
 
 
-OS_VERSION = "33.0.0 (Robuna)"
+OS_VERSION = "34.2.9 (Mojave) - Stable"
 
 class SettingsApp:
     def __init__(self):
@@ -103,6 +103,11 @@ class SettingsApp:
         ttk.Label(parent, text=f"FranchukOS Version: {OS_VERSION}", font=("Segoe UI", 10)).pack(anchor="w", padx=20, pady=5)
         ttk.Label(parent, text="© 2025 FranchukOS Project Authors. All rights reserved", font=("Segoe UI", 9)).pack(anchor="w", padx=20, pady=2)
         ttk.Button(parent, text="About", command=self.show_about).pack(anchor="w", padx=20, pady=10)
+        ttk.Label(parent, text="Screensaver Timeout (minutes):", font=("Segoe UI", 10)).pack(anchor="w", padx=20, pady=(10,2))
+        timeout_var = tk.IntVar(value=int(self.config.get("screensaver_timeout", 300)) // 60)
+        timeout_spin = ttk.Spinbox(parent, from_=1, to=60, textvariable=timeout_var, width=5)
+        timeout_spin.pack(anchor="w", padx=20, pady=2)
+        ttk.Button(parent, text="Apply Screensaver Timeout", command=lambda: self.set_screensaver_timeout(timeout_var.get())).pack(anchor="w", padx=20, pady=5)
 
     def build_utilities_tab(self, parent):
         ttk.Label(parent, text="Utilities", font=("Segoe UI", 12, "bold")).pack(anchor="w", pady=(10, 2), padx=10)
@@ -152,6 +157,11 @@ class SettingsApp:
         save_config(self.config)
         apply_theme(self.root, theme)
 
+    def set_screensaver_timeout(self, minutes):
+        self.config["screensaver_timeout"] = int(minutes) * 60
+        save_config(self.config)
+        messagebox.showinfo("Screensaver", f"Screensaver timeout set to {minutes} minutes.\nRestart desktop to apply.")
+
     def show_about(self):
         messagebox.showinfo(
             "About FranchukOS",
@@ -173,7 +183,7 @@ class SettingsApp:
             import datetime
             filename = f"screenshot_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
             pyautogui.screenshot(filename)
-            messagebox.showinfo("Screenshot", f"Screenshot saved as {filename}")
+            print(f"Screenshot saved as {filename}")
         except ImportError:
             messagebox.showerror("Error", "pyautogui is not installed.")
 

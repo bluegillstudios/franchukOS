@@ -194,6 +194,7 @@ class Taskbar(tk.Frame):
         productivity_menu.add_command(label="Birdseye", command=self.launch_birdseye)
         productivity_menu.add_command(label="Sheets", command=self.launch_sheets)
         productivity_menu.add_command(label="Calculator", command=self.launch_calc)
+        productivity_menu.add_command(label="Notetaking", command=self.launch_note)
         menu.add_cascade(label="Productivity", menu=productivity_menu)
 
         # System submenu
@@ -219,7 +220,6 @@ class Taskbar(tk.Frame):
         games_menu.add_command(label="Aloha", command=self.launch_aloha)
         games_menu.add_command(label="Minesweeper", command=self.launch_mines)
         games_menu.add_command(label="Tetris", command=self.launch_tetris)
-        games_menu.add_command(label="Athena", command=self.launch_athena)
         menu.add_cascade(label="Games", menu=games_menu)
 
         menu.add_separator()
@@ -319,19 +319,16 @@ class Taskbar(tk.Frame):
             subprocess.Popen([sys.executable, "Applications/store.py"])
         except Exception as e:
             print(f"Failed to launch Franny's Pop Shop: {e}")
-    def launch_athena(self):
-        try:
-            subprocess.Popen([sys.executable, "Applications/games/fps.py"])
-        except Exception as e:
-            print(f"Failed to launch Athena: {e}")
     def launch_calc(self):
         try:
             subprocess.Popen([sys.executable, "Applications/calculator.py"])
         except Exception as e:
             print(f"Failed to launch Calculator: {e}")
-    
-    
-
+    def launch_note(self):
+        try:
+            subprocess.Popen([sys.executable, "Applications/notetaking.py"])
+        except Exception as e:
+            print(f"Failed to launch Note: {e}")
 if __name__ == "__main__":
     taskbar = Taskbar()
     taskbar.mainloop()

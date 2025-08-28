@@ -8,6 +8,8 @@ from PyQt5.QtWebEngineWidgets import *
 from PyQt5.QtWebEngineWidgets import QWebEngineDownloadItem
 from PyQt5.QtGui import QIcon, QPalette, QColor, QFontMetrics, QKeySequence
 from PyQt5.QtWidgets import QStyle, QProxyStyle, QShortcut
+from PyQt5.QtPrintSupport import QPrinter
+from PyQt5.QtWidgets import QListWidget, QListWidgetItem, QSlider
 import json
 import os
 from collections import defaultdict
@@ -39,7 +41,7 @@ class BrowserTab(QWebEngineView):
         default_agent = profile.httpUserAgent()
         custom_agent = default_agent.replace(
             default_agent.split(' ')[0],
-            "Franny/17.3.3"
+            "Franny/18.0.1025.162"
         )
         profile.setHttpUserAgent(custom_agent)
         self.setUrl(QUrl("https://www.google.com"))
@@ -51,6 +53,12 @@ class BrowserTab(QWebEngineView):
         else:
             self.window().showNormal()
         request.accept()
+
+    def show_devtools(self):
+        if not hasattr(self, 'devtools') or self.devtools is None:
+            self.devtools = QWebEngineView()
+            self.page().setDevToolsPage(self.devtools.page())
+        self.devtools.show()
 
 class PDFViewerTab(QWebEngineView):
     def __init__(self, pdf_url, parent=None):
@@ -178,8 +186,7 @@ class FrannyBrowser(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Franny (v17.3.3)")
-        self.setGeometry(100, 100, 1024, 768)
+        self.setWindowTitle("Franny (v18.2.11)")  
 
         self.tabs = QTabWidget(self)
         self.tabs.setTabsClosable(True)
@@ -225,6 +232,8 @@ class FrannyBrowser(QMainWindow):
         self.closed_tabs = []  # Stack for closed tabs
         self.tab_groups = {}  # tab index -> group name
         self.group_colors = {}  # group name -> color
+
+        self.minimalist_mode = False  # Minimalist mode state
 
         self.init_toolbar()
         self.init_menu()
@@ -307,7 +316,9 @@ class FrannyBrowser(QMainWindow):
 
     def init_menu(self):
         menu_bar = self.menuBar()
-        file_menu = menu_bar.addMenu("Options")
+
+        
+        file_menu = menu_bar.addMenu("Tabs and Modes")
         new_tab_action = QAction("New Tab", self)
         new_tab_action.triggered.connect(self.new_tab)
         file_menu.addAction(new_tab_action)
@@ -321,42 +332,77 @@ class FrannyBrowser(QMainWindow):
         incognito_action.triggered.connect(self.toggle_incognito)
         file_menu.addAction(incognito_action)
 
-        add_bookmark_action = QAction("Add Bookmark", self)
-        add_bookmark_action.triggered.connect(self.add_bookmark)
-        file_menu.addAction(add_bookmark_action)
+        save_pdf_action = QAction("Save as PDF", self)
+        save_pdf_action.triggered.connect(self.save_as_pdf)
+        file_menu.addAction(save_pdf_action)
 
-        import_bookmarks_action = QAction("Import Bookmarks", self)
-        import_bookmarks_action.triggered.connect(self.import_bookmarks)
-        file_menu.addAction(import_bookmarks_action)
+        settings_action = QAction("Settings", self)
+        settings_action.triggered.connect(self.show_settings)
+        file_menu.addAction(settings_action)
 
-        export_bookmarks_action = QAction("Export Bookmarks", self)
-        export_bookmarks_action.triggered.connect(self.export_bookmarks)
-        file_menu.addAction(export_bookmarks_action)
-
+        file_menu.addSeparator()
         clear_data_action = QAction("Clear Data", self)
         clear_data_action.triggered.connect(self.clear_data)
         file_menu.addAction(clear_data_action)
 
+        # View menu
+        view_menu = menu_bar.addMenu("View")
         zoom_in_action = QAction("Zoom In", self)
         zoom_in_action.triggered.connect(self.zoom_in)
-        file_menu.addAction(zoom_in_action)
+        view_menu.addAction(zoom_in_action)
 
         zoom_out_action = QAction("Zoom Out", self)
         zoom_out_action.triggered.connect(self.zoom_out)
-        file_menu.addAction(zoom_out_action)
+        view_menu.addAction(zoom_out_action)
 
         find_in_page_action = QAction("Find in Page", self)
         find_in_page_action.triggered.connect(self.find_in_page)
-        file_menu.addAction(find_in_page_action)
+        view_menu.addAction(find_in_page_action)
 
+        devtools_action = QAction("Open DevTools", self)
+        devtools_action.setShortcut("F12")
+        devtools_action.triggered.connect(lambda: self.current_browser().show_devtools())
+        view_menu.addAction(devtools_action)
+
+        minimalist_toggle_action = QAction("Toggle Minimalist Mode", self)
+        minimalist_toggle_action.triggered.connect(self.toggle_minimalist_mode)
+        view_menu.addAction(minimalist_toggle_action)
+
+        resource_viewer_action = QAction("Site Resource Viewer", self)
+        resource_viewer_action.triggered.connect(self.show_resource_viewer)
+        view_menu.addAction(resource_viewer_action)
+
+        # Bookmarks menu
+        bookmarks_menu = menu_bar.addMenu("Bookmarks")
+        add_bookmark_action = QAction("Add Bookmark", self)
+        add_bookmark_action.triggered.connect(self.add_bookmark)
+        bookmarks_menu.addAction(add_bookmark_action)
+
+        import_bookmarks_action = QAction("Import Bookmarks", self)
+        import_bookmarks_action.triggered.connect(self.import_bookmarks)
+        bookmarks_menu.addAction(import_bookmarks_action)
+
+        export_bookmarks_action = QAction("Export Bookmarks", self)
+        export_bookmarks_action.triggered.connect(self.export_bookmarks)
+        bookmarks_menu.addAction(export_bookmarks_action)
+
+        self.bookmarks_action = QAction("Show Bookmarks", self)
+        self.bookmarks_action.triggered.connect(self.show_bookmarks)
+        bookmarks_menu.addAction(self.bookmarks_action)
+
+        # Tools menu
+        tools_menu = menu_bar.addMenu("Tools")
         download_manager_action = QAction("Download Manager", self)
         download_manager_action.triggered.connect(self.show_download_manager)
-        file_menu.addAction(download_manager_action)
+        tools_menu.addAction(download_manager_action)
 
-        bookmark_menu = menu_bar.addMenu("Bookmarks")
-        self.bookmarks_action = QAction("Bookmarks", self)
-        self.bookmarks_action.triggered.connect(self.show_bookmarks)
-        bookmark_menu.addAction(self.bookmarks_action)
+        minimalist_toggle_action = QAction("Toggle Minimalist Mode", self)
+        minimalist_toggle_action.triggered.connect(self.toggle_minimalist_mode)
+        file_menu.addAction(minimalist_toggle_action)
+
+        resource_viewer_action = QAction("Site Resource Viewer", self)
+        resource_viewer_action.triggered.connect(self.show_resource_viewer)
+        file_menu.addAction(resource_viewer_action)
 
     def init_bookmarks_bar(self):
         self.bookmarks_bar = QToolBar("Bookmarks Bar", self)
@@ -649,6 +695,7 @@ class FrannyBrowser(QMainWindow):
         QShortcut(QKeySequence("Ctrl+F"), self, activated=self.find_in_page)
         QShortcut(QKeySequence("Ctrl++"), self, activated=self.zoom_in)
         QShortcut(QKeySequence("Ctrl+-"), self, activated=self.zoom_out)
+        QShortcut(QKeySequence("Ctrl+Shift+F"), self, activated=self.search_tabs)
 
     def next_tab(self):
         idx = self.tabs.currentIndex()
@@ -705,6 +752,121 @@ class FrannyBrowser(QMainWindow):
             else:
                 self.tabs.tabBar().setTabData(idx, None)
         self.tabs.tabBar().update()
+
+    def save_as_pdf(self):
+        browser = self.current_browser()
+        if not browser:
+            return
+        file_path, _ = QFileDialog.getSaveFileName(self, "Save as PDF", "", "PDF Files (*.pdf)")
+        if file_path:
+            if not file_path.lower().endswith(".pdf"):
+                file_path += ".pdf"
+            def pdf_finished(path, ok):
+                if ok:
+                    self.status_bar.showMessage(f"Saved PDF: {path}")
+                else:
+                    self.status_bar.showMessage("Failed to save PDF.")
+            browser.page().printToPdf(file_path, pageLayout=None, callback=lambda ok: pdf_finished(file_path, ok))
+
+    def show_settings(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Settings")
+        layout = QVBoxLayout()
+
+        home_label = QLabel("Homepage URL:")
+        home_input = QLineEdit(self)
+        home_input.setText(getattr(self, "homepage", "https://www.google.com"))
+        layout.addWidget(home_label)
+        layout.addWidget(home_input)
+
+        zoom_label = QLabel("Default Zoom:")
+        zoom_slider = QSlider(Qt.Horizontal)
+        zoom_slider.setRange(5, 20)
+        zoom_slider.setValue(int(getattr(self, "zoom_level", 1.0) * 10))
+        layout.addWidget(zoom_label)
+        layout.addWidget(zoom_slider)
+
+        save_btn = QPushButton("Save")
+        save_btn.clicked.connect(lambda: self.apply_settings(home_input.text(), zoom_slider.value() / 10, dialog))
+        layout.addWidget(save_btn)
+
+        dialog.setLayout(layout)
+        dialog.exec_()
+
+    def apply_settings(self, homepage, zoom, dialog):
+        self.homepage = homepage
+        self.zoom_level = zoom
+        self.current_browser().setZoomFactor(zoom)
+        self.status_bar.showMessage("Settings applied.")
+        dialog.accept()
+
+    def search_tabs(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Search Tabs")
+        layout = QVBoxLayout()
+        search_bar = QLineEdit()
+        list_widget = QListWidget()
+
+        def update_results():
+            query = search_bar.text().lower()
+            list_widget.clear()
+            for i in range(self.tabs.count()):
+                title = self.tabs.tabText(i).lower()
+                url = self.tabs.widget(i).url().toString().lower()
+                if query in title or query in url:
+                    item = QListWidgetItem(self.tabs.tabText(i))
+                    item.setData(Qt.UserRole, i)
+                    list_widget.addItem(item)
+
+        search_bar.textChanged.connect(update_results)
+        layout.addWidget(search_bar)
+        layout.addWidget(list_widget)
+
+        list_widget.itemDoubleClicked.connect(lambda item: self.tabs.setCurrentIndex(item.data(Qt.UserRole)))
+        dialog.setLayout(layout)
+        update_results()
+        dialog.exec_()
+
+    def toggle_minimalist_mode(self):
+        self.minimalist_mode = not self.minimalist_mode
+        self.menuBar().setVisible(not self.minimalist_mode)
+        self.toolbar.setVisible(not self.minimalist_mode)
+        self.bookmarks_bar.setVisible(not self.minimalist_mode)
+        self.statusBar().setVisible(not self.minimalist_mode)
+        self.status_bar.showMessage("Minimalist Mode {}".format("Enabled" if self.minimalist_mode else "Disabled"))
+
+    def show_resource_viewer(self):
+        browser = self.current_browser()
+        if not browser:
+            return
+
+        page = browser.page()
+        profile = page.profile()
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Site Resource Viewer")
+        layout = QVBoxLayout()
+
+        list_widget = QListWidget()
+        layout.addWidget(list_widget)
+
+        def on_request_intercepted(info):
+            list_widget.addItem(info.requestUrl().toString())
+
+        class ResourceInterceptor(QWebEngineUrlRequestInterceptor):
+            def interceptRequest(self, info):
+                on_request_intercepted(info)
+
+        # Attach new interceptor
+        self._resource_interceptor = ResourceInterceptor()
+        profile.setRequestInterceptor(self._resource_interceptor)
+
+        dialog.setLayout(layout)
+        dialog.resize(600, 400)
+        dialog.exec_()
+
+        # Reset interceptor to avoid global capture
+        profile.setRequestInterceptor(None)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
