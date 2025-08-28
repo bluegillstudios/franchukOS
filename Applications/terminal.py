@@ -20,9 +20,9 @@ import subprocess
 import threading
 
 # --- FSL Integration ---
-from FSL import core as fsl_core
-from FSL import distro_manager as fsl_manager
-from FSL import shell as fsl_shell
+from fsl import core as fsl_core
+from fsl import manager as fsl_manager
+from fsl import shell as fsl_shell
 
 
 class Terminal(tk.Toplevel):

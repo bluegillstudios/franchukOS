@@ -10,6 +10,7 @@ from PyQt5.QtGui import QIcon, QPalette, QColor, QFontMetrics, QKeySequence
 from PyQt5.QtWidgets import QStyle, QProxyStyle, QShortcut
 from PyQt5.QtPrintSupport import QPrinter
 from PyQt5.QtWidgets import QListWidget, QListWidgetItem, QSlider
+from PyQt5.QtWebEngineCore import QWebEngineUrlRequestInterceptor
 import json
 import os
 from collections import defaultdict
@@ -41,7 +42,7 @@ class BrowserTab(QWebEngineView):
         default_agent = profile.httpUserAgent()
         custom_agent = default_agent.replace(
             default_agent.split(' ')[0],
-            "Franny/18.0.1025.162"
+            "Franny/19.0.910"
         )
         profile.setHttpUserAgent(custom_agent)
         self.setUrl(QUrl("https://www.google.com"))
@@ -59,6 +60,9 @@ class BrowserTab(QWebEngineView):
             self.devtools = QWebEngineView()
             self.page().setDevToolsPage(self.devtools.page())
         self.devtools.show()
+
+    def show_element_inspector(self):
+        self.page().runJavaScript("inspect()")
 
 class PDFViewerTab(QWebEngineView):
     def __init__(self, pdf_url, parent=None):
@@ -157,6 +161,29 @@ class PDFViewerTab(QWebEngineView):
             };
             document.body.appendChild(btn);
 
+            // Export button
+            var exportBtn = document.createElement('button');
+            exportBtn.textContent = 'Export Annotations';
+            exportBtn.style.position = 'fixed';
+            exportBtn.style.top = '50px';
+            exportBtn.style.right = '10px';
+            exportBtn.style.zIndex = 10000;
+            exportBtn.style.background = '#222';
+            exportBtn.style.color = '#fff';
+            exportBtn.style.padding = '8px 16px';
+            exportBtn.style.border = 'none';
+            exportBtn.style.borderRadius = '6px';
+            exportBtn.style.cursor = 'pointer';
+            exportBtn.onclick = function() {
+                var canvas = document.getElementById('franny-pdf-annotator');
+                var dataURL = canvas.toDataURL('image/png');
+                var a = document.createElement('a');
+                a.href = dataURL;
+                a.download = 'annotations.png';
+                a.click();
+            };
+            document.body.appendChild(exportBtn);
+
             // Resize canvas on window resize
             window.addEventListener('resize', function() {
                 var img = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -186,7 +213,7 @@ class FrannyBrowser(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Franny (v18.2.11)")  
+        self.setWindowTitle("Franny (v19.0.910)")  
 
         self.tabs = QTabWidget(self)
         self.tabs.setTabsClosable(True)
@@ -786,87 +813,114 @@ class FrannyBrowser(QMainWindow):
         layout.addWidget(zoom_label)
         layout.addWidget(zoom_slider)
 
+        theme_label = QLabel("Theme:")
+        theme_combo = QComboBox()
+        theme_combo.addItems(THEMES.keys())
+        layout.addWidget(theme_label)
+        layout.addWidget(theme_combo)
+
+        adblock_checkbox = QCheckBox("Enable Ad/Tracker Blocker")
+        adblock_checkbox.setChecked(getattr(self, "adblock_enabled", False))
+        layout.addWidget(adblock_checkbox)
+
         save_btn = QPushButton("Save")
-        save_btn.clicked.connect(lambda: self.apply_settings(home_input.text(), zoom_slider.value() / 10, dialog))
+        save_btn.clicked.connect(lambda: self.apply_settings(
+            home_input.text(), zoom_slider.value() / 10, theme_combo.currentText(),
+            adblock_checkbox.isChecked(), dialog))
         layout.addWidget(save_btn)
 
         dialog.setLayout(layout)
         dialog.exec_()
 
-    def apply_settings(self, homepage, zoom, dialog):
+    def apply_settings(self, homepage, zoom, theme, adblock_enabled, dialog):
         self.homepage = homepage
         self.zoom_level = zoom
         self.current_browser().setZoomFactor(zoom)
+        apply_theme(QApplication.instance(), theme)
+        self.adblock_enabled = adblock_enabled
+        if adblock_enabled:
+            self._adblocker = FrannyAdBlocker()
+            for i in range(self.tabs.count()):
+                browser = self.tabs.widget(i)
+                browser.page().profile().setRequestInterceptor(self._adblocker)
+        else:
+            for i in range(self.tabs.count()):
+                browser = self.tabs.widget(i)
+                browser.page().profile().setRequestInterceptor(None)
         self.status_bar.showMessage("Settings applied.")
         dialog.accept()
 
-    def search_tabs(self):
+    # --- Toolbar Customization Example ---
+    def show_toolbar_customization(self):
         dialog = QDialog(self)
-        dialog.setWindowTitle("Search Tabs")
+        dialog.setWindowTitle("Customize Toolbar")
         layout = QVBoxLayout()
-        search_bar = QLineEdit()
-        list_widget = QListWidget()
-
-        def update_results():
-            query = search_bar.text().lower()
-            list_widget.clear()
-            for i in range(self.tabs.count()):
-                title = self.tabs.tabText(i).lower()
-                url = self.tabs.widget(i).url().toString().lower()
-                if query in title or query in url:
-                    item = QListWidgetItem(self.tabs.tabText(i))
-                    item.setData(Qt.UserRole, i)
-                    list_widget.addItem(item)
-
-        search_bar.textChanged.connect(update_results)
-        layout.addWidget(search_bar)
-        layout.addWidget(list_widget)
-
-        list_widget.itemDoubleClicked.connect(lambda item: self.tabs.setCurrentIndex(item.data(Qt.UserRole)))
+        btns = []
+        for action in self.toolbar.actions():
+            cb = QCheckBox(action.text())
+            cb.setChecked(action.isVisible())
+            cb.stateChanged.connect(lambda state, a=action: a.setVisible(state == Qt.Checked))
+            layout.addWidget(cb)
+            btns.append(cb)
         dialog.setLayout(layout)
-        update_results()
         dialog.exec_()
 
-    def toggle_minimalist_mode(self):
-        self.minimalist_mode = not self.minimalist_mode
-        self.menuBar().setVisible(not self.minimalist_mode)
-        self.toolbar.setVisible(not self.minimalist_mode)
-        self.bookmarks_bar.setVisible(not self.minimalist_mode)
-        self.statusBar().setVisible(not self.minimalist_mode)
-        self.status_bar.showMessage("Minimalist Mode {}".format("Enabled" if self.minimalist_mode else "Disabled"))
-
-    def show_resource_viewer(self):
+    # --- Per-site Permissions Example ---
+    def show_site_permissions(self):
         browser = self.current_browser()
-        if not browser:
-            return
-
         page = browser.page()
-        profile = page.profile()
-
         dialog = QDialog(self)
-        dialog.setWindowTitle("Site Resource Viewer")
+        dialog.setWindowTitle("Site Permissions")
         layout = QVBoxLayout()
-
-        list_widget = QListWidget()
-        layout.addWidget(list_widget)
-
-        def on_request_intercepted(info):
-            list_widget.addItem(info.requestUrl().toString())
-
-        class ResourceInterceptor(QWebEngineUrlRequestInterceptor):
-            def interceptRequest(self, info):
-                on_request_intercepted(info)
-
-        # Attach new interceptor
-        self._resource_interceptor = ResourceInterceptor()
-        profile.setRequestInterceptor(self._resource_interceptor)
-
+        for perm in [QWebEnginePage.PermissionCamera, QWebEnginePage.PermissionMicrophone, QWebEnginePage.PermissionNotifications]:
+            label = QLabel(str(perm))
+            btn = QPushButton("Toggle")
+            btn.clicked.connect(lambda _, p=perm: page.setFeaturePermission(
+                page.url(), p, QWebEnginePage.PermissionGrantedByUser))
+            layout.addWidget(label)
+            layout.addWidget(btn)
         dialog.setLayout(layout)
-        dialog.resize(600, 400)
         dialog.exec_()
 
-        # Reset interceptor to avoid global capture
-        profile.setRequestInterceptor(None)
+# --- Privacy & Security: Simple Ad/Tracker Blocker ---
+class FrannyAdBlocker(QWebEngineUrlRequestInterceptor):
+    def __init__(self, blocklist=None):
+        super().__init__()
+        self.blocklist = blocklist or [
+            "doubleclick.net", "googlesyndication.com", "adservice.google.com",
+            "ads.yahoo.com", "adnxs.com", "tracking", "analytics"
+        ]
+    def interceptRequest(self, info):
+        url = info.requestUrl().toString()
+        if any(bad in url for bad in self.blocklist):
+            info.block(True)
+
+# --- Customization: Theme Selection ---
+THEMES = {
+    "Dark": {
+        "window": QColor(53, 53, 53),
+        "text": Qt.white,
+        "base": QColor(35, 35, 35),
+        "highlight": QColor(42, 130, 218)
+    },
+    "Light": {
+        "window": Qt.white,
+        "text": Qt.black,
+        "base": QColor(245, 245, 245),
+        "highlight": QColor(42, 130, 218)
+    }
+}
+
+def apply_theme(app, theme_name):
+    theme = THEMES.get(theme_name, THEMES["Dark"])
+    palette = QPalette()
+    palette.setColor(QPalette.Window, theme["window"])
+    palette.setColor(QPalette.WindowText, theme["text"])
+    palette.setColor(QPalette.Base, theme["base"])
+    palette.setColor(QPalette.Text, theme["text"])
+    palette.setColor(QPalette.Highlight, theme["highlight"])
+    palette.setColor(QPalette.HighlightedText, theme["text"])
+    app.setPalette(palette)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
