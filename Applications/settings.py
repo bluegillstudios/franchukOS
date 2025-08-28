@@ -174,7 +174,8 @@ class SettingsApp:
 
     def open_terminal(self):
         import subprocess
-        subprocess.Popen('Applications/terminal.py')
+        import sys
+        subprocess.Popen([sys.executable, 'Applications/terminal.py'])
 
     def take_screenshot(self):
         try:
