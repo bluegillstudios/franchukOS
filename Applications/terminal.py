@@ -452,29 +452,32 @@ class Terminal(tk.Toplevel):
         cmd = args[0]
         cmd_args = args[1:] if len(args) > 1 else []
 
-        buffer = io.StringIO()
-        stdout = sys.stdout
-        sys.stdout = buffer
-        try:
-            if cmd == "list":
-                fsl_manager.list_distros()
-            elif cmd == "install":
-                if not cmd_args:
-                    print("Specify a distro to install.")
-                else:
-                    fsl_manager.install_distro(cmd_args[0])
-            elif cmd == "run":
-                if not cmd_args:
-                    print("Specify a distro to run.")
-                else:
-                    distro_name = cmd_args[0]
-                    t = threading.Thread(target=fsl_shell.run_distro, args=(distro_name,))
-                    t.start()
-                    print(f"Launching {distro_name}...")
+        if cmd == "install":
+            # FIX! Let install_distro print directly to stdout 
+            if not cmd_args:
+                print("Specify a distro to install.")
             else:
-                print("Unknown fsl command. Available: list, install, run")
-        except Exception as e:
-            print(f"FSL error: {str(e)}")
-        finally:
-            sys.stdout = stdout
-        return buffer.getvalue()
+                fsl_manager.install_distro(cmd_args[0])
+            return "Started installation (see main console for progress/output)."
+        else:
+            buffer = io.StringIO()
+            stdout = sys.stdout
+            sys.stdout = buffer
+            try:
+                if cmd == "list":
+                    fsl_manager.list_distros()
+                elif cmd == "run":
+                    if not cmd_args:
+                        print("Specify a distro to run.")
+                    else:
+                        distro_name = cmd_args[0]
+                        t = threading.Thread(target=fsl_shell.run_distro, args=(distro_name,))
+                        t.start()
+                        print(f"Launching {distro_name}...")
+                else:
+                    print("Unknown fsl command. Available: list, install, run")
+            except Exception as e:
+                print(f"FSL error: {str(e)}")
+            finally:
+                sys.stdout = stdout
+            return buffer.getvalue()
