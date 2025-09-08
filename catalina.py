@@ -23,10 +23,10 @@ def show_splash(next_step_callback):
             self.configure(bg="white")
 
             # Load images
-            logo_img = Image.open("Assets/icons/logo.png")
+            logo_img = Image.open("assets/icons/logo.png")
             logo_img = ImageOps.contain(logo_img, (128, 128), Image.LANCZOS)
 
-            text_img = Image.open("Assets/icons/holdon.png")
+            text_img = Image.open("assets/icons/holdon.png")
             text_img = ImageOps.contain(text_img, (300, 64), Image.LANCZOS)
 
             self.logo_photo = ImageTk.PhotoImage(logo_img)
