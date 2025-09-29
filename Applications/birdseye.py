@@ -84,8 +84,40 @@ class CodeHighlighter(QSyntaxHighlighter):
             'volatile', 'while', 'true', 'false', 'null'
         ]
 
+        go_keywords = [
+            'break', 'case', 'chan', 'const', 'continue', 'default', 'defer', 'else', 'fallthrough',
+            'for', 'func', 'go', 'goto', 'if', 'import', 'interface', 'map', 'package', 'range',
+            'return', 'select', 'struct', 'switch', 'type', 'var', 'true', 'false', 'nil'
+        ]
+
+        kotlin_keywords = [
+            'as', 'break', 'class', 'continue', 'do', 'else', 'false', 'for', 'fun', 'if', 'in',
+            'interface', 'is', 'null', 'object', 'package', 'return', 'super', 'this', 'throw',
+            'true', 'try', 'typealias', 'val', 'var', 'when', 'while'
+        ]
+
+        html_keywords = [
+            'html', 'head', 'body', 'title', 'meta', 'link', 'script', 'style', 'div', 'span',
+            'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'a', 'img', 'ul', 'ol', 'li', 'table',
+            'tr', 'td', 'th', 'form', 'input', 'button', 'select', 'option', 'textarea', 'br', 'hr'
+        ]
+
+        css_keywords = [
+            'color', 'background', 'margin', 'padding', 'border', 'font', 'display', 'position',
+            'top', 'left', 'right', 'bottom', 'width', 'height', 'min-width', 'max-width',
+            'min-height', 'max-height', 'flex', 'grid', 'align', 'justify', 'content', 'gap',
+            'overflow', 'z-index', 'float', 'clear', 'visibility', 'opacity'
+        ]
+
+        shell_keywords = [
+            'if', 'then', 'else', 'fi', 'for', 'while', 'do', 'done', 'case', 'esac', 'function',
+            'echo', 'exit', 'break', 'continue', 'return', 'in', 'local', 'export', 'readonly',
+            'declare', 'typeset', 'set', 'unset', 'test', 'true', 'false'
+        ]
+
         all_keywords = set(
-            cpp_keywords + csharp_keywords + python_keywords + rust_keywords + javascript_keywords + java_keywords
+            cpp_keywords + csharp_keywords + python_keywords + rust_keywords + javascript_keywords + java_keywords +
+            go_keywords + kotlin_keywords + html_keywords + css_keywords + shell_keywords
         )
         self.highlighting_rules += [(QRegExp(r'\b' + kw + r'\b'), keyword_format) for kw in all_keywords]
 
@@ -212,7 +244,7 @@ class CodeEditor(QPlainTextEdit):
                 size += 1
             elif delta < 0:
                 size -= 1
-            size = max(6, size)  # Clamp to minimum 6pt
+            size = max(6, min(size, 48))  # Clamp between 6pt and 48pt
             font.setPointSize(size)
             self.setFont(font)
             self._default_font_size = size
@@ -333,7 +365,7 @@ class SearchReplaceDialog(QDialog):
 class Birdseye(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Birdseye v5.1")
+        self.setWindowTitle("Birdseye v5.2.0")
         self.setGeometry(100, 100, 1280, 800)
         self.setWindowIcon(QIcon()) 
 
@@ -426,7 +458,7 @@ class Birdseye(QMainWindow):
 
         # Language selection
         lang_menu = menu.addMenu("Language")
-        for lang in ["Auto", "Python", "C++", "C#", "Rust", "JavaScript", "Java", "Plain Text"]:
+        for lang in ["Auto", "Python", "C++", "C#", "Rust", "JavaScript", "Java", "Plain Text", "Go", "Kotlin", "HTML", "CSS", "Shell"]:
             action = QAction(lang, self)
             action.triggered.connect(lambda _, l=lang: self.set_language(l))
             lang_menu.addAction(action)
@@ -465,11 +497,11 @@ class Birdseye(QMainWindow):
         QMessageBox.about(
             self,
             "About Birdseye",
-            "<b>Birdseye v5.1.644.92</b><br>"
+            "<b>Birdseye v5.2.0</b><br>"
             "A simple multi-language code editor for FranchukOS.<br><br>"
             "Copyright 2025 the FranchukOS project authors.<br>"
             "Licensed under the Apache License, Version 2.0.<br><br>"
-            "</ul>https://github.com/bluegillstudios/franchukOS</ul>"
+            "View the source code here: </ul>https://github.com/bluegillstudios/franchukOS</ul>"
         )
 
     def set_language(self, lang):
@@ -491,6 +523,16 @@ class Birdseye(QMainWindow):
                     lang = "JavaScript"
                 elif ext in [".java"]:
                     lang = "Java"
+                elif ext in [".go"]:
+                    lang = "Go"
+                elif ext in [".kt"]:
+                    lang = "Kotlin"
+                elif ext in [".html", ".htm"]:
+                    lang = "HTML"
+                elif ext in [".css"]:
+                    lang = "CSS"
+                elif ext in [".sh", ".bash"]:
+                    lang = "Shell"
                 else:
                     lang = "Plain Text"
             else:
@@ -548,6 +590,37 @@ class Birdseye(QMainWindow):
                 'super', 'switch', 'synchronized', 'this', 'throw', 'throws', 'transient', 'try', 'void',
                 'volatile', 'while', 'true', 'false', 'null'
             ]
+        elif lang == "Go":
+            keywords = [
+                'break', 'case', 'chan', 'const', 'continue', 'default', 'defer', 'else', 'fallthrough',
+                'for', 'func', 'go', 'goto', 'if', 'import', 'interface', 'map', 'package', 'range',
+                'return', 'select', 'struct', 'switch', 'type', 'var', 'true', 'false', 'nil'
+            ]
+        elif lang == "Kotlin":
+            keywords = [
+                'as', 'break', 'class', 'continue', 'do', 'else', 'false', 'for', 'fun', 'if', 'in',
+                'interface', 'is', 'null', 'object', 'package', 'return', 'super', 'this', 'throw',
+                'true', 'try', 'typealias', 'val', 'var', 'when', 'while'
+            ]
+        elif lang == "HTML":
+            keywords = [
+                'html', 'head', 'body', 'title', 'meta', 'link', 'script', 'style', 'div', 'span',
+                'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'a', 'img', 'ul', 'ol', 'li', 'table',
+                'tr', 'td', 'th', 'form', 'input', 'button', 'select', 'option', 'textarea', 'br', 'hr'
+            ]
+        elif lang == "CSS":
+            keywords = [
+                'color', 'background', 'margin', 'padding', 'border', 'font', 'display', 'position',
+                'top', 'left', 'right', 'bottom', 'width', 'height', 'min-width', 'max-width',
+                'min-height', 'max-height', 'flex', 'grid', 'align', 'justify', 'content', 'gap',
+                'overflow', 'z-index', 'float', 'clear', 'visibility', 'opacity'
+            ]
+        elif lang == "Shell":
+            keywords = [
+                'if', 'then', 'else', 'fi', 'for', 'while', 'do', 'done', 'case', 'esac', 'function',
+                'echo', 'exit', 'break', 'continue', 'return', 'in', 'local', 'export', 'readonly',
+                'declare', 'typeset', 'set', 'unset', 'test', 'true', 'false'
+            ]
         else:
             keywords = []
 
@@ -558,12 +631,13 @@ class Birdseye(QMainWindow):
         keyword_format.setFontWeight(QFont.Bold)
         editor.highlighter.highlighting_rules += [(QRegExp(r'\b' + kw + r'\b'), keyword_format) for kw in keywords]
 
-        # Improve by v5.0.0
+        # Comments
         comment_format = QTextCharFormat()
         comment_format.setForeground(QColor("#75715e"))
         comment_format.setFontItalic(True)
         editor.highlighter.highlighting_rules.append((QRegExp(r'//.*'), comment_format))
         editor.highlighter.highlighting_rules.append((QRegExp(r'#.*'), comment_format))
+        # Strings
         string_format = QTextCharFormat()
         string_format.setForeground(QColor("#e6db74"))
         editor.highlighter.highlighting_rules.append((QRegExp(r'"[^"\\]*(\\.[^"\\]*)*"'), string_format))

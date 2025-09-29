@@ -11,3 +11,4 @@ ar
 beautifulsoup4 
 requests
 markdown
+customtkinter

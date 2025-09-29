@@ -15,6 +15,8 @@ import json
 import os
 from collections import defaultdict
 import random
+import platform
+import psutil
 
 BOOKMARKS_PATH = "config/bookmarks.json"
 HISTORY_PATH = "config/history.json"
@@ -466,6 +468,35 @@ class FrannyBrowser(QMainWindow):
             self.bookmarks_bar.addAction(action)
 
     def add_new_tab(self, qurl=None, label="New Tab"):
+        # Special Franny URLs
+        if qurl and qurl.toString().startswith("franny://"):
+            url_str = qurl.toString()
+            if url_str == "franny://version":
+                widget = QWidget()
+                layout = QVBoxLayout()
+                layout.addWidget(QLabel(f"Franny Version: v20.0.0"))
+                layout.addWidget(QLabel(f"Python: {platform.python_version()}"))
+                layout.addWidget(QLabel(f"Qt: {QT_VERSION_STR}"))
+                widget.setLayout(layout)
+                i = self.tabs.addTab(widget, "Version")
+                self.tabs.setCurrentIndex(i)
+                return
+            elif url_str == "franny://newtab":
+                super().add_new_tab(QUrl("https://www.google.com"), "New Tab")
+                return
+            elif url_str == "franny://mem":
+                widget = QWidget()
+                layout = QVBoxLayout()
+                process = psutil.Process(os.getpid())
+                mem_info = process.memory_info()
+                layout.addWidget(QLabel(f"Memory Usage: {mem_info.rss // (1024*1024)} MB"))
+                layout.addWidget(QLabel(f"Peak Memory: {mem_info.vms // (1024*1024)} MB"))
+                layout.addWidget(QLabel(f"System Memory: {psutil.virtual_memory().percent}% used"))
+                widget.setLayout(layout)
+                i = self.tabs.addTab(widget, "Memory")
+                self.tabs.setCurrentIndex(i)
+                return
+        # ...existing code for normal tabs...
         browser = BrowserTab(self)
         browser.setUrl(qurl or QUrl("https://www.google.com"))
         i = self.tabs.addTab(browser, label)
@@ -475,7 +506,6 @@ class FrannyBrowser(QMainWindow):
         browser.titleChanged.connect(lambda title, b=browser: self.tabs.setTabText(self.tabs.indexOf(b), title))
         browser.iconChanged.connect(lambda icon, b=browser: self.tabs.setTabIcon(self.tabs.indexOf(b), icon))
         browser.loadFinished.connect(lambda: self.update_address_bar(self.tabs.currentIndex()))
-        # Download handling
         browser.page().profile().downloadRequested.connect(self.handle_download_requested)
         self.update_tab_group_styles()
 
@@ -667,6 +697,35 @@ class FrannyBrowser(QMainWindow):
                 self.status_bar.showMessage(f"Export failed: {e}")
 
     def add_new_tab(self, qurl=None, label="New Tab"):
+        # Special Franny URLs
+        if qurl and qurl.toString().startswith("franny://"):
+            url_str = qurl.toString()
+            if url_str == "franny://version":
+                widget = QWidget()
+                layout = QVBoxLayout()
+                layout.addWidget(QLabel(f"Franny Version: v20.0.0"))
+                layout.addWidget(QLabel(f"Python: {platform.python_version()}"))
+                layout.addWidget(QLabel(f"Qt: {QT_VERSION_STR}"))
+                widget.setLayout(layout)
+                i = self.tabs.addTab(widget, "Version")
+                self.tabs.setCurrentIndex(i)
+                return
+            elif url_str == "franny://newtab":
+                super().add_new_tab(QUrl("https://www.google.com"), "New Tab")
+                return
+            elif url_str == "franny://mem":
+                widget = QWidget()
+                layout = QVBoxLayout()
+                process = psutil.Process(os.getpid())
+                mem_info = process.memory_info()
+                layout.addWidget(QLabel(f"Memory Usage: {mem_info.rss // (1024*1024)} MB"))
+                layout.addWidget(QLabel(f"Peak Memory: {mem_info.vms // (1024*1024)} MB"))
+                layout.addWidget(QLabel(f"System Memory: {psutil.virtual_memory().percent}% used"))
+                widget.setLayout(layout)
+                i = self.tabs.addTab(widget, "Memory")
+                self.tabs.setCurrentIndex(i)
+                return
+        # ...existing code for normal tabs...
         browser = BrowserTab(self)
         browser.setUrl(qurl or QUrl("https://www.google.com"))
         i = self.tabs.addTab(browser, label)
@@ -823,6 +882,7 @@ class FrannyBrowser(QMainWindow):
         theme_label = QLabel("Theme:")
         theme_combo = QComboBox()
         theme_combo.addItems(THEMES.keys())
+        theme_combo.setCurrentText(getattr(self, "theme", "Dark"))
         layout.addWidget(theme_label)
         layout.addWidget(theme_combo)
 
@@ -842,6 +902,7 @@ class FrannyBrowser(QMainWindow):
     def apply_settings(self, homepage, zoom, theme, adblock_enabled, dialog):
         self.homepage = homepage
         self.zoom_level = zoom
+        self.theme = theme
         self.current_browser().setZoomFactor(zoom)
         apply_theme(QApplication.instance(), theme)
         self.adblock_enabled = adblock_enabled
@@ -915,6 +976,18 @@ THEMES = {
         "text": Qt.black,
         "base": QColor(245, 245, 245),
         "highlight": QColor(42, 130, 218)
+    },
+    "Solarized": {
+        "window": QColor(0xFDF6E3),
+        "text": QColor(0x657B83),
+        "base": QColor(0xEEE8D5),
+        "highlight": QColor(0x268BD2)
+    },
+    "High Contrast": {
+        "window": Qt.black,
+        "text": Qt.yellow,
+        "base": Qt.black,
+        "highlight": Qt.red
     }
 }
 
