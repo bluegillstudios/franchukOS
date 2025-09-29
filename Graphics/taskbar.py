@@ -195,6 +195,7 @@ class Taskbar(tk.Frame):
         productivity_menu.add_command(label="Sheets", command=self.launch_sheets)
         productivity_menu.add_command(label="Calculator", command=self.launch_calc)
         productivity_menu.add_command(label="Notetaking", command=self.launch_note)
+        productivity_menu.add_command(label="Franmail", command=self.launch_email)
         menu.add_cascade(label="Productivity", menu=productivity_menu)
 
         # System submenu
@@ -265,6 +266,8 @@ class Taskbar(tk.Frame):
 
         menu.post(event.x_root, event.y_root)
 
+    # This shit has got so fucked. 
+    # Maybe we can do something about this when v40 rolls around. 
     def launch_file_explorer(self):
         self.window_manager.open_window("File Explorer", FileExplorer)
     def launch_terminal(self):
@@ -335,7 +338,11 @@ class Taskbar(tk.Frame):
             subprocess.Popen([sys.executable, "Applications/tempo.py"])
         except Exception as e:
             print(f"Failed to launch Tempo: {e}")
-
+    def launch_email(self):
+        try:
+            subprocess.Popen([sys.executable, "Applications/franmail.py"])
+        except Exception as e:
+            print(f"Failed to launch Franmail: {e}")
 if __name__ == "__main__":
     taskbar = Taskbar()
     taskbar.mainloop()
