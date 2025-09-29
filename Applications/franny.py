@@ -606,7 +606,8 @@ class FrannyBrowser(QMainWindow):
     def save_history(self):
         with open(HISTORY_PATH, "w") as file:
             json.dump(self.history, file)
-
+            
+    # This fucked franny and we never knew? Cool
     def load_history(self):
         if os.path.exists(HISTORY_PATH):
             try:
