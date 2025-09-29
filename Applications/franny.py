@@ -213,7 +213,7 @@ class FrannyBrowser(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Franny (v19.0.910)")  
+        self.setWindowTitle("Franny (v20.0.0)")  
 
         self.tabs = QTabWidget(self)
         self.tabs.setTabsClosable(True)
