@@ -265,6 +265,8 @@ class Taskbar(tk.Frame):
 
         menu.post(event.x_root, event.y_root)
 
+    # This shit has got so fucked. 
+    # Maybe we can do something about this when v40 rolls around. 
     def launch_file_explorer(self):
         self.window_manager.open_window("File Explorer", FileExplorer)
     def launch_terminal(self):

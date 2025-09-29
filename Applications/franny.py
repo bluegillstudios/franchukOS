@@ -609,8 +609,14 @@ class FrannyBrowser(QMainWindow):
 
     def load_history(self):
         if os.path.exists(HISTORY_PATH):
-            with open(HISTORY_PATH, "r") as file:
-                return json.load(file)
+            try:
+                with open(HISTORY_PATH, "r") as file:
+                    content = file.read().strip()
+                    if not content:
+                        return []
+                    return json.loads(content)
+            except Exception:
+                return []
         return []
 
     def clear_data(self):
