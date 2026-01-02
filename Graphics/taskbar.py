@@ -6,6 +6,8 @@ from tkinter import messagebox
 import time
 from threading import Thread
 from datetime import datetime
+
+import pygame
 from Applications.file_explorer import FileExplorer
 from Applications.terminal import Terminal
 from Applications.settings import SettingsApp
@@ -19,7 +21,6 @@ from Applications.franpaint import Franpaint
 from Applications.taskmgr import TaskManager
 from Applications.franny import FrannyBrowser
 from Applications.birdseye import Birdseye
-import playsound
 import subprocess
 import sys
 
@@ -236,9 +237,14 @@ class Taskbar(tk.Frame):
     def exit_os(self):
         confirm = messagebox.askyesno("Exit", "Are you sure you want to exit FranchukOS?")
         if confirm:
-            self.quit()
-            playsound.playsound("assets/sounds/shutdown.wav")  
+            # Load and play the shutdown sound
+            pygame.mixer.music.load("assets/sounds/shutdown.wav")
+            pygame.mixer.music.play()   
+        # Wait for the sound to finish before quitting
+        while pygame.mixer.music.get_busy():
+            pygame.time.Clock().tick(10)
 
+        self.quit()
     def add_taskbar_button(self, window_name):
         button = tk.Button(self.taskbar_buttons_frame, text=window_name, command=lambda: self.window_manager.switch_to_window(window_name))
         button.bind("<Button-3>", lambda event, name=window_name: self.show_taskbar_context_menu(event, name))
