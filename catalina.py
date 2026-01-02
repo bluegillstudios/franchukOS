@@ -13,9 +13,13 @@ from colorama import init, Fore
 import os
 
 init()
-print(Fore.RED + 'BM: STABLE BUILD, M38. REV182')
+print(Fore.RED + 'BM: STABLE BUILD, M37. REV182')
 time.sleep(0.25)
 print(Fore.RESET + '[    2.8351] I/QTTranslations: Loaded translation file for language EN.')
+time.sleep(0.05)
+print("[    2.8451] I/QTTranslations: Loaded translation file for language FR.")
+time.sleep(0.05)
+print("[    2.8451] I/QTTranslations: Loaded translation file for language ES.")
 time.sleep(0.05)
 print("[    8.4575] V/Bus: RAM is mapped at 0x149f65e0000.")
 time.sleep(0.05)

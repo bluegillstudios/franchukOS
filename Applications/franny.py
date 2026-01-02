@@ -481,6 +481,7 @@ class FrannyBrowser(QMainWindow):
                 layout.addWidget(QLabel(f"Qt: {QT_VERSION_STR}"))
                 layout.addWidget(QLabel(f"PyQt: {PYQT_VERSION_STR}"))
                 layout.addWidget(QLabel(f"Platform: {platform.platform()}"))
+                
                 widget.setLayout(layout)
                 i = self.tabs.addTab(widget, "Version")
                 self.tabs.setCurrentIndex(i)
@@ -636,8 +637,9 @@ class FrannyBrowser(QMainWindow):
     def save_bookmarks(self, bookmarks):
         with open(BOOKMARKS_PATH, "w") as file:
             json.dump(bookmarks, file)
-
+    # Save browsing history to a JSON file
     def save_history(self):
+        os.makedirs(os.path.dirname(HISTORY_PATH), exist_ok=True)  # Ensure the config directory exists
         with open(HISTORY_PATH, "w") as file:
             json.dump(self.history, file)
             
@@ -998,6 +1000,60 @@ class FrannyBrowser(QMainWindow):
             layout.addWidget(btn)
         dialog.setLayout(layout)
         dialog.exec_()
+
+    def toggle_minimalist_mode(self):
+        self.minimalist_mode = not self.minimalist_mode
+        if self.minimalist_mode:
+            self.toolbar.hide()
+            self.bookmarks_bar.hide()
+            self.status_bar.hide()
+            self.status_bar.showMessage("Minimalist Mode Enabled")
+        else:
+            self.toolbar.show()
+            self.bookmarks_bar.show()
+            self.status_bar.show()
+            self.status_bar.showMessage("Minimalist Mode Disabled")
+
+    def show_resource_viewer(self):
+        browser = self.current_browser()
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Site Resource Viewer")
+        layout = QVBoxLayout()
+        resources_text = QTextEdit()
+        resources_text.setReadOnly(True)
+        layout.addWidget(resources_text)
+        dialog.setLayout(layout)
+        def show_resources():
+            js_code = """
+            (function() {
+                var resources = {
+                    images: [],
+                    scripts: [],
+                    stylesheets: []
+                };
+                document.querySelectorAll('img').forEach(img => resources.images.push(img.src));
+                document.querySelectorAll('script').forEach(script => resources.scripts.push(script.src));
+                document.querySelectorAll('link[rel="stylesheet"]').forEach(link => resources.stylesheets.push(link.href));
+                return JSON.stringify(resources, null, 2);
+            })();
+            """
+            browser.page().runJavaScript(js_code, lambda result: resources_text.setText(result))
+        show_resources()
+        dialog.exec_()
+
+    def search_tabs(self):
+        search_text, ok = QInputDialog.getText(self, "Search Tabs", "Enter search text:")
+        if ok and search_text:
+            results = []
+            for i in range(self.tabs.count()):
+                tab = self.tabs.widget(i)
+                if search_text.lower() in self.tabs.tabText(i).lower():
+                    results.append(i)
+            if results:
+                self.tabs.setCurrentIndex(results[0])
+                self.status_bar.showMessage(f"Found {len(results)} matching tab(s)")
+            else:
+                self.status_bar.showMessage("No matching tabs found")
 
 # --- Privacy & Security: Simple Ad/Tracker Blocker ---
 class FrannyAdBlocker(QWebEngineUrlRequestInterceptor):
