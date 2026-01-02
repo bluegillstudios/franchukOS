@@ -18,6 +18,8 @@ import random
 import platform
 import psutil
 
+FRANNY_VERSION = "v21.0.0"
+
 BOOKMARKS_PATH = "config/bookmarks.json"
 HISTORY_PATH = "config/history.json"
 
@@ -215,7 +217,7 @@ class FrannyBrowser(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Franny (v20.0.0)")  
+        self.setWindowTitle(f"Franny ({FRANNY_VERSION})")  
 
         self.tabs = QTabWidget(self)
         self.tabs.setTabsClosable(True)
@@ -474,7 +476,7 @@ class FrannyBrowser(QMainWindow):
             if url_str == "franny://version":
                 widget = QWidget()
                 layout = QVBoxLayout()
-                layout.addWidget(QLabel(f"Franny Version: v20.0.0"))
+                layout.addWidget(QLabel(f"Franny Version: {FRANNY_VERSION}"))
                 layout.addWidget(QLabel(f"Python: {platform.python_version()}"))
                 layout.addWidget(QLabel(f"Qt: {QT_VERSION_STR}"))
                 widget.setLayout(layout)
@@ -703,7 +705,7 @@ class FrannyBrowser(QMainWindow):
             if url_str == "franny://version":
                 widget = QWidget()
                 layout = QVBoxLayout()
-                layout.addWidget(QLabel(f"Franny Version: v20.0.0"))
+                layout.addWidget(QLabel(f"Franny Version: {FRANNY_VERSION}"))
                 layout.addWidget(QLabel(f"Python: {platform.python_version()}"))
                 layout.addWidget(QLabel(f"Qt: {QT_VERSION_STR}"))
                 widget.setLayout(layout)
