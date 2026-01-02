@@ -4,9 +4,6 @@
 import tkinter as tk
 from tkinter import messagebox, ttk, colorchooser, simpledialog
 import time
-import threading
-import winsound
-import playsound
 import datetime
 
 class ClockApp(tk.Toplevel):
@@ -161,22 +158,11 @@ class ClockApp(tk.Toplevel):
         elif self.timer_running and self.timer_seconds == 0:
             self.timer_label.config(text="00:00:00")
             self.timer_running = False
-            self.timer_alert()
+            messagebox.showinfo("Timer", "Time's up!")
 
     def cancel_timer(self):
         self.timer_running = False
         self.timer_label.config(text="00:00:00")
-
-    def timer_alert(self):
-        messagebox.showinfo("Timer", "Time's up!")
-        try:
-            winsound.Beep(1000, 1000)
-        except Exception:
-            pass
-        try:
-            playsound.playsound("wake.mp3")
-        except Exception:
-            pass
 
     # --- ALARM ---
     def init_alarm_tab(self):
@@ -189,7 +175,6 @@ class ClockApp(tk.Toplevel):
         self.remove_alarm_btn = tk.Button(btn_frame, text="Remove", command=self.remove_alarm, width=10, bg="#444", fg="white")
         self.remove_alarm_btn.grid(row=0, column=1, padx=5)
         self.alarms = []
-        self.alarm_threads = []
         self.check_alarms()
 
     def add_alarm(self):
@@ -219,19 +204,8 @@ class ClockApp(tk.Toplevel):
             self.alarm_list.delete(0, tk.END)
             for alarm in self.alarms:
                 self.alarm_list.insert(tk.END, alarm)
-            self.alarm_trigger()
-        self.after(1000 * 30, self.check_alarms)  # check every 30 seconds
-
-    def alarm_trigger(self):
-        messagebox.showinfo("Alarm", "It's time!")
-        try:
-            winsound.Beep(1500, 1000)
-        except Exception:
-            pass
-        try:
-            playsound.playsound("wake.mp3")
-        except Exception:
-            pass
+            messagebox.showinfo("Alarm", "It's time!")
+        self.after(1000 * 30, self.check_alarms)
 
     # --- WORLD CLOCK ---
     def init_world_tab(self):
@@ -260,7 +234,6 @@ class ClockApp(tk.Toplevel):
             del self.cities[idx]
 
     def update_world_clock(self):
-        # For demo: just show UTC and local time, real implementation would use pytz or zoneinfo
         self.world_list.delete(0, tk.END)
         self.world_list.insert(tk.END, f"Local: {datetime.datetime.now().strftime('%H:%M:%S')}")
         self.world_list.insert(tk.END, f"UTC:   {datetime.datetime.utcnow().strftime('%H:%M:%S')}")
