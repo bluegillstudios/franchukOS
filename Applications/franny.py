@@ -892,11 +892,34 @@ class FrannyBrowser(QMainWindow):
         adblock_checkbox.setChecked(getattr(self, "adblock_enabled", False))
         layout.addWidget(adblock_checkbox)
 
+        # Sync settings (MVP local encrypted store)
+        sync_label = QLabel("Sync (experimental):")
+        layout.addWidget(sync_label)
+        self.sync_enabled_cb = QCheckBox("Enable Sync (local encrypted store)")
+        self.sync_enabled_cb.setChecked(getattr(self, "sync_enabled", False))
+        layout.addWidget(self.sync_enabled_cb)
+
+        self.sync_pass_input = QLineEdit(self)
+        self.sync_pass_input.setEchoMode(QLineEdit.Password)
+        self.sync_pass_input.setPlaceholderText("Sync passphrase")
+        layout.addWidget(self.sync_pass_input)
+
+        test_sync_btn = QPushButton("Test Sync")
+        test_sync_btn.clicked.connect(lambda: self.test_sync(home_input.text()))
+        layout.addWidget(test_sync_btn)
+
         save_btn = QPushButton("Save")
         save_btn.clicked.connect(lambda: self.apply_settings(
             home_input.text(), zoom_slider.value() / 10, theme_combo.currentText(),
             adblock_checkbox.isChecked(), dialog))
         layout.addWidget(save_btn)
+
+        # Save/close settings
+        save_close_btn = QPushButton("Save & Close")
+        save_close_btn.clicked.connect(lambda: self.apply_settings(
+            home_input.text(), zoom_slider.value() / 10, theme_combo.currentText(),
+            adblock_checkbox.isChecked(), dialog))
+        layout.addWidget(save_close_btn)
 
         dialog.setLayout(layout)
         dialog.exec_()
@@ -919,6 +942,28 @@ class FrannyBrowser(QMainWindow):
                 browser.page().profile().setRequestInterceptor(None)
         self.status_bar.showMessage("Settings applied.")
         dialog.accept()
+
+    def test_sync(self, homepage):
+        """Test sync using local encrypted store. Writes a sample key and reads it back."""
+        if not getattr(self, 'sync_enabled_cb', None) or not self.sync_enabled_cb.isChecked():
+            self.status_bar.showMessage("Sync is disabled.")
+            return
+        passphrase = self.sync_pass_input.text() if getattr(self, 'sync_pass_input', None) else None
+        if not passphrase:
+            self.status_bar.showMessage("Set a sync passphrase first.")
+            return
+        try:
+            from crypto.sync import SyncStore
+            store_path = os.path.join(os.path.expanduser('~'), '.franny_sync_store')
+            store = SyncStore(store_path, passphrase)
+            store.set('test_key', {'homepage': homepage})
+            data = store.get('test_key')
+            if data and data.get('homepage') == homepage:
+                self.status_bar.showMessage('Sync test OK (local encrypted store).')
+            else:
+                self.status_bar.showMessage('Sync test failed.')
+        except Exception as e:
+            self.status_bar.showMessage(f"Sync error: {e}")
 
     # --- Toolbar Customization Example ---
     def show_toolbar_customization(self):
