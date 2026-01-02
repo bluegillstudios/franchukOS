@@ -137,3 +137,5 @@ cython_debug/
 
 # VS Code settings
 .vscode/
+
+Applications/games/world/

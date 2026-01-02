@@ -12,3 +12,8 @@ beautifulsoup4
 requests
 markdown
 customtkinter
+cryptography
+pytest
+keyring
+bleach
+email-validator

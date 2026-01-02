@@ -18,6 +18,8 @@ import random
 import platform
 import psutil
 
+FRANNY_VERSION = "v21.0.0"
+
 BOOKMARKS_PATH = "config/bookmarks.json"
 HISTORY_PATH = "config/history.json"
 
@@ -215,7 +217,7 @@ class FrannyBrowser(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Franny (v20.0.0)")  
+        self.setWindowTitle(f"Franny ({FRANNY_VERSION})")  
 
         self.tabs = QTabWidget(self)
         self.tabs.setTabsClosable(True)
@@ -474,9 +476,12 @@ class FrannyBrowser(QMainWindow):
             if url_str == "franny://version":
                 widget = QWidget()
                 layout = QVBoxLayout()
-                layout.addWidget(QLabel(f"Franny Version: v20.0.0"))
+                layout.addWidget(QLabel(f"Franny Version: {FRANNY_VERSION}"))
                 layout.addWidget(QLabel(f"Python: {platform.python_version()}"))
                 layout.addWidget(QLabel(f"Qt: {QT_VERSION_STR}"))
+                layout.addWidget(QLabel(f"PyQt: {PYQT_VERSION_STR}"))
+                layout.addWidget(QLabel(f"Platform: {platform.platform()}"))
+                
                 widget.setLayout(layout)
                 i = self.tabs.addTab(widget, "Version")
                 self.tabs.setCurrentIndex(i)
@@ -632,8 +637,9 @@ class FrannyBrowser(QMainWindow):
     def save_bookmarks(self, bookmarks):
         with open(BOOKMARKS_PATH, "w") as file:
             json.dump(bookmarks, file)
-
+    # Save browsing history to a JSON file
     def save_history(self):
+        os.makedirs(os.path.dirname(HISTORY_PATH), exist_ok=True)  # Ensure the config directory exists
         with open(HISTORY_PATH, "w") as file:
             json.dump(self.history, file)
             
@@ -703,7 +709,7 @@ class FrannyBrowser(QMainWindow):
             if url_str == "franny://version":
                 widget = QWidget()
                 layout = QVBoxLayout()
-                layout.addWidget(QLabel(f"Franny Version: v20.0.0"))
+                layout.addWidget(QLabel(f"Franny Version: {FRANNY_VERSION}"))
                 layout.addWidget(QLabel(f"Python: {platform.python_version()}"))
                 layout.addWidget(QLabel(f"Qt: {QT_VERSION_STR}"))
                 widget.setLayout(layout)
@@ -890,11 +896,34 @@ class FrannyBrowser(QMainWindow):
         adblock_checkbox.setChecked(getattr(self, "adblock_enabled", False))
         layout.addWidget(adblock_checkbox)
 
+        # Sync settings (MVP local encrypted store)
+        sync_label = QLabel("Sync (experimental):")
+        layout.addWidget(sync_label)
+        self.sync_enabled_cb = QCheckBox("Enable Sync (local encrypted store)")
+        self.sync_enabled_cb.setChecked(getattr(self, "sync_enabled", False))
+        layout.addWidget(self.sync_enabled_cb)
+
+        self.sync_pass_input = QLineEdit(self)
+        self.sync_pass_input.setEchoMode(QLineEdit.Password)
+        self.sync_pass_input.setPlaceholderText("Sync passphrase")
+        layout.addWidget(self.sync_pass_input)
+
+        test_sync_btn = QPushButton("Test Sync")
+        test_sync_btn.clicked.connect(lambda: self.test_sync(home_input.text()))
+        layout.addWidget(test_sync_btn)
+
         save_btn = QPushButton("Save")
         save_btn.clicked.connect(lambda: self.apply_settings(
             home_input.text(), zoom_slider.value() / 10, theme_combo.currentText(),
             adblock_checkbox.isChecked(), dialog))
         layout.addWidget(save_btn)
+
+        # Save/close settings
+        save_close_btn = QPushButton("Save & Close")
+        save_close_btn.clicked.connect(lambda: self.apply_settings(
+            home_input.text(), zoom_slider.value() / 10, theme_combo.currentText(),
+            adblock_checkbox.isChecked(), dialog))
+        layout.addWidget(save_close_btn)
 
         dialog.setLayout(layout)
         dialog.exec_()
@@ -917,6 +946,28 @@ class FrannyBrowser(QMainWindow):
                 browser.page().profile().setRequestInterceptor(None)
         self.status_bar.showMessage("Settings applied.")
         dialog.accept()
+
+    def test_sync(self, homepage):
+        """Test sync using local encrypted store. Writes a sample key and reads it back."""
+        if not getattr(self, 'sync_enabled_cb', None) or not self.sync_enabled_cb.isChecked():
+            self.status_bar.showMessage("Sync is disabled.")
+            return
+        passphrase = self.sync_pass_input.text() if getattr(self, 'sync_pass_input', None) else None
+        if not passphrase:
+            self.status_bar.showMessage("Set a sync passphrase first.")
+            return
+        try:
+            from crypto.sync import SyncStore
+            store_path = os.path.join(os.path.expanduser('~'), '.franny_sync_store')
+            store = SyncStore(store_path, passphrase)
+            store.set('test_key', {'homepage': homepage})
+            data = store.get('test_key')
+            if data and data.get('homepage') == homepage:
+                self.status_bar.showMessage('Sync test OK (local encrypted store).')
+            else:
+                self.status_bar.showMessage('Sync test failed.')
+        except Exception as e:
+            self.status_bar.showMessage(f"Sync error: {e}")
 
     # --- Toolbar Customization Example ---
     def show_toolbar_customization(self):
@@ -949,6 +1000,60 @@ class FrannyBrowser(QMainWindow):
             layout.addWidget(btn)
         dialog.setLayout(layout)
         dialog.exec_()
+
+    def toggle_minimalist_mode(self):
+        self.minimalist_mode = not self.minimalist_mode
+        if self.minimalist_mode:
+            self.toolbar.hide()
+            self.bookmarks_bar.hide()
+            self.status_bar.hide()
+            self.status_bar.showMessage("Minimalist Mode Enabled")
+        else:
+            self.toolbar.show()
+            self.bookmarks_bar.show()
+            self.status_bar.show()
+            self.status_bar.showMessage("Minimalist Mode Disabled")
+
+    def show_resource_viewer(self):
+        browser = self.current_browser()
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Site Resource Viewer")
+        layout = QVBoxLayout()
+        resources_text = QTextEdit()
+        resources_text.setReadOnly(True)
+        layout.addWidget(resources_text)
+        dialog.setLayout(layout)
+        def show_resources():
+            js_code = """
+            (function() {
+                var resources = {
+                    images: [],
+                    scripts: [],
+                    stylesheets: []
+                };
+                document.querySelectorAll('img').forEach(img => resources.images.push(img.src));
+                document.querySelectorAll('script').forEach(script => resources.scripts.push(script.src));
+                document.querySelectorAll('link[rel="stylesheet"]').forEach(link => resources.stylesheets.push(link.href));
+                return JSON.stringify(resources, null, 2);
+            })();
+            """
+            browser.page().runJavaScript(js_code, lambda result: resources_text.setText(result))
+        show_resources()
+        dialog.exec_()
+
+    def search_tabs(self):
+        search_text, ok = QInputDialog.getText(self, "Search Tabs", "Enter search text:")
+        if ok and search_text:
+            results = []
+            for i in range(self.tabs.count()):
+                tab = self.tabs.widget(i)
+                if search_text.lower() in self.tabs.tabText(i).lower():
+                    results.append(i)
+            if results:
+                self.tabs.setCurrentIndex(results[0])
+                self.status_bar.showMessage(f"Found {len(results)} matching tab(s)")
+            else:
+                self.status_bar.showMessage("No matching tabs found")
 
 # --- Privacy & Security: Simple Ad/Tracker Blocker ---
 class FrannyAdBlocker(QWebEngineUrlRequestInterceptor):
