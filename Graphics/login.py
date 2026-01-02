@@ -7,6 +7,8 @@ from PIL import Image, ImageTk, ImageFilter
 import os
 import pygame
 
+
+
 # ---- TRANSLATION DICTIONARY ----
 TRANSLATIONS = {
     "en": {

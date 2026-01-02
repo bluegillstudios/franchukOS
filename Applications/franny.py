@@ -479,6 +479,8 @@ class FrannyBrowser(QMainWindow):
                 layout.addWidget(QLabel(f"Franny Version: {FRANNY_VERSION}"))
                 layout.addWidget(QLabel(f"Python: {platform.python_version()}"))
                 layout.addWidget(QLabel(f"Qt: {QT_VERSION_STR}"))
+                layout.addWidget(QLabel(f"PyQt: {PYQT_VERSION_STR}"))
+                layout.addWidget(QLabel(f"Platform: {platform.platform()}"))
                 widget.setLayout(layout)
                 i = self.tabs.addTab(widget, "Version")
                 self.tabs.setCurrentIndex(i)
