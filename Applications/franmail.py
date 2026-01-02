@@ -6,6 +6,14 @@ import smtplib
 import imaplib
 import email
 from tkinter import messagebox, scrolledtext
+import json
+import os
+
+try:
+    import keyring
+except Exception:
+    keyring = None
+
 
 # Email Configuration
 SMTP_SERVER = "smtp.gmail.com"
@@ -18,7 +26,7 @@ ctk.set_default_color_theme("blue")  # Color Theme
 class ModernEmailApp(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("Franmail v1.0.0")
+        self.title("Franmail v1.4.00")
         self.geometry("800x700")
         
         self.create_login_frame()
@@ -37,17 +45,47 @@ class ModernEmailApp(ctk.CTk):
 
         self.login_btn = ctk.CTkButton(self.login_frame, text="Login", command=self.login)
         self.login_btn.pack(pady=20)
+        ctk.CTkButton(self.login_frame, text="Use App Password", command=self.use_app_password).pack(pady=5)
 
     def login(self):
         self.email_address = self.email_entry.get()
         self.password = self.pass_entry.get()
+        # Try reading app password or stored token from keyring if available and password is empty
+        if keyring and not self.password:
+            stored = keyring.get_password('franmail', self.email_address)
+            if stored:
+                try:
+                    data = json.loads(stored)
+                    # If stored token found, cannot use it directly as IMAP password
+                    # fallthrough and let user use OAuth or app password
+                except Exception:
+                    # stored is likely an app password string
+                    self.password = stored
         try:
             self.imap = imaplib.IMAP4_SSL(IMAP_SERVER)
             self.imap.login(self.email_address, self.password)
+            # Save app password into OS keyring for convenience
+            if keyring and self.password:
+                keyring.set_password('franmail', self.email_address, self.password)
             self.login_frame.destroy()
             self.create_main_frame()
         except Exception as e:
             messagebox.showerror("Login Failed", f"Error: {e}")
+
+    def use_app_password(self):
+        # Store current email & password into keyring and attempt login
+        self.email_address = self.email_entry.get()
+        self.password = self.pass_entry.get()
+        if not self.email_address or not self.password:
+            messagebox.showwarning("Missing", "Please enter email and app password first.")
+            return
+        if keyring:
+            keyring.set_password('franmail', self.email_address, self.password)
+        self.login()
+
+    def oauth_login(self):
+        # OAuth2 sign-in has been disabled. Keep this stub so UI calls are safe.
+        messagebox.showinfo("Disabled", "OAuth2 sign-in is disabled. Please use an App Password or IMAP credentials.")
 
     def create_main_frame(self):
         self.main_frame = ctk.CTkFrame(self, corner_radius=10)
@@ -105,6 +143,12 @@ class ModernEmailApp(ctk.CTk):
 
     def load_inbox(self):
         try:
+            if not getattr(self, 'imap', None):
+                self.inbox_list.configure(state="normal")
+                self.inbox_list.delete("1.0", "end")
+                self.inbox_list.insert("end", "Not connected to IMAP. Inbox will appear here after successful login or after IMAP OAuth is implemented.\n")
+                self.inbox_list.configure(state="disabled")
+                return
             self.imap.select("inbox")
             status, messages = self.imap.search(None, "ALL")
             self.email_ids = messages[0].split()

@@ -6,12 +6,11 @@ import threading
 import json
 import itertools
 
-# why did i do it like this
 APP_NAME = "Tempo"
 VERSION = "1.0.0"
 
 pygame.mixer.init()
-
+# why did i do it like this
 notes = {
     "C": "Applications/sounds/C.aiff",
     "D": "Applications/sounds/D.aiff",

@@ -1,3 +1,6 @@
+# Copyright 2025 the FranchukOS project authors.
+# Contributed under the Apache License, Version 2.0.
+
 # Minimal encrypted sync store (local-only MVP)
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
@@ -18,13 +21,15 @@ class SyncStore:
         self.path = path
         self.passphrase = passphrase.encode('utf-8')
         self.iterations = iterations
-        self._fernet = self._derive_fernet(self.passphrase, iterations)
+        # per-store random salt persisted to <store>.salt
+        self._salt_path = f"{self.path}.salt"
+        self.salt = self._load_or_create_salt()
+        self._fernet = self._derive_fernet(self.passphrase, iterations, self.salt)
         # ensure file exists
         if not os.path.exists(self.path):
             self._write_encrypted({})
 
-    def _derive_fernet(self, passphrase: bytes, iterations: int) -> Fernet:
-        salt = b'franny-sync-salt'  # fixed salt for now (replace with stored random salt later)
+    def _derive_fernet(self, passphrase: bytes, iterations: int, salt: bytes) -> Fernet:
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
@@ -34,6 +39,24 @@ class SyncStore:
         )
         key = base64.urlsafe_b64encode(kdf.derive(passphrase))
         return Fernet(key)
+
+    def _load_or_create_salt(self) -> bytes:
+        """Load the salt from disk or create and persist a new random salt (16 bytes)."""
+        try:
+            if os.path.exists(self._salt_path):
+                with open(self._salt_path, 'rb') as f:
+                    return f.read()
+        except Exception:
+            # If reading fails, fall through and create a new salt
+            pass
+        s = os.urandom(16)
+        try:
+            with open(self._salt_path, 'wb') as f:
+                f.write(s)
+        except Exception:
+            # If writing salt fails, still return the generated salt (non-persistent)
+            pass
+        return s
 
     def _read_encrypted(self) -> dict:
         with open(self.path, 'rb') as f:
