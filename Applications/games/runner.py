@@ -63,29 +63,24 @@ achievements = {
     "To infinity and beyond": False,
     "Need a drink?": False,
     "Well I'll be!": False,
-    "Did it for big T": False,
-    "There we go": False,
-    "Wowzers!": False,
     "For the memes": False,
-    "Hippity hoppity": False,
+    "Did it for big T": False,
     "Like a bunny": False,
     "Could've jumped to space": False,
     "Even better than a bunny": False,
-    "Woah": False,
-    "Turn the screen off": False,
+    "Hippity hoppity": False,
     "Reaction time": False,
     "Got it to a tee": False,
     "Way to be": False,
     "Just a pro": False,
-    "How?": False, 
-    "Unbelievable": False,
+    "How?": False
 }
 achievement_messages = []
 
 def unlock_achievement(name):
     if not achievements[name]:
         achievements[name] = True
-        achievement_messages.append([name, 180])  # show for 3 seconds
+        achievement_messages.append([name, 180])
         print(f"Achievement unlocked: {name}")
 
 # -------------------- FUNCTIONS --------------------
@@ -100,74 +95,76 @@ def spawn_obstacle():
     width = random.randint(20, 40)
     x = WIDTH + random.randint(0, 100)
     y = ground_y - height
-    obstacles.append(pygame.Rect(x, y, width, height))
+    obstacles.append({
+        "rect": pygame.Rect(x, y, width, height),
+        "counted": False
+    })
 
 def move_obstacles():
     global obstacles, obstacles_dodged
     for obs in obstacles:
-        obs.x -= game_speed
-    # count obstacles dodged
-    for obs in obstacles:
-        if obs.x + obs.width < player_x and not hasattr(obs, 'counted'):
+        obs["rect"].x -= game_speed
+
+        if obs["rect"].right < player_x and not obs["counted"]:
             obstacles_dodged += 1
-            obs.counted = True
-    obstacles = [o for o in obstacles if o.x + o.width > 0]
+            obs["counted"] = True
+
+    obstacles = [o for o in obstacles if o["rect"].right > 0]
 
 def draw_obstacles():
     for obs in obstacles:
-        pygame.draw.rect(screen, RED, obs)
+        pygame.draw.rect(screen, RED, obs["rect"])
 
 def check_collision():
     player_rect = pygame.Rect(player_x, player_y, player_size, player_size)
     for obs in obstacles:
-        if player_rect.colliderect(obs):
+        if player_rect.colliderect(obs["rect"]):
             return True
     return False
 
 def draw_score():
-    score_surf = FONT.render(f"Score: {score}", True, BLACK)
-    screen.blit(score_surf, (10, 10))
+    screen.blit(FONT.render(f"Score: {score}", True, BLACK), (10, 10))
 
 def draw_background():
     global bg_scroll
     screen.fill(SKY)
 
-    # Mountains (parallax slower)
     for mx, my in mountains:
-        pygame.draw.polygon(screen, MOUNTAIN, [(mx - bg_scroll*0.5, my), 
-                                               (mx + 100 - bg_scroll*0.5, my + 100),
-                                               (mx - 200 - bg_scroll*0.5, my + 100)])
+        pygame.draw.polygon(
+            screen, MOUNTAIN,
+            [(mx - bg_scroll * 0.5, my),
+             (mx + 100 - bg_scroll * 0.5, my + 100),
+             (mx - 200 - bg_scroll * 0.5, my + 100)]
+        )
 
-    # Clouds (parallax faster)
-    for i, (cx, cy) in enumerate(clouds):
-        pygame.draw.ellipse(screen, CLOUD, (cx - bg_scroll*1.2, cy, 80, 40))
+    for cx, cy in clouds:
+        pygame.draw.ellipse(screen, CLOUD, (cx - bg_scroll * 1.2, cy, 80, 40))
 
     bg_scroll += bg_speed
     if bg_scroll > WIDTH:
         bg_scroll = 0
 
 def draw_achievements():
-    y_offset = 50
-    for i, (msg, timer) in enumerate(achievement_messages):
-        text_surf = ACHIEVE_FONT.render(f"Achievement Unlocked: {msg}", True, YELLOW)
-        screen.blit(text_surf, (WIDTH//2 - text_surf.get_width()//2, y_offset))
-        y_offset += 30
-        achievement_messages[i][1] -= 1
-    # remove expired messages
+    y = 50
+    for msg, timer in achievement_messages:
+        txt = ACHIEVE_FONT.render(f"Achievement Unlocked: {msg}", True, YELLOW)
+        screen.blit(txt, (WIDTH//2 - txt.get_width()//2, y))
+        y += 30
+    for m in achievement_messages:
+        m[1] -= 1
     achievement_messages[:] = [m for m in achievement_messages if m[1] > 0]
 
 def game_over():
-    text = FONT.render("GAME OVER - Press R to Restart", True, BLACK)
-    screen.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 2))
+    txt = FONT.render("GAME OVER - Press R to Restart", True, BLACK)
+    screen.blit(txt, (WIDTH//2 - txt.get_width()//2, HEIGHT//2))
     pygame.display.flip()
-    wait = True
-    while wait:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
+    while True:
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
-                wait = False
+            if e.type == pygame.KEYDOWN and e.key == pygame.K_r:
+                return
 
 # -------------------- MAIN LOOP --------------------
 running = True
@@ -185,7 +182,7 @@ while running:
                 jump_count += 1
                 total_jumps += 1
 
-    # Player physics
+    # Physics
     player_vel_y += gravity
     player_y += player_vel_y
 
@@ -202,50 +199,35 @@ while running:
 
     move_obstacles()
 
-    # Difficulty scaling
+    # Difficulty
     score = (pygame.time.get_ticks() - start_ticks) // 100
     game_speed = 7 + score // 15
     bg_speed = 2 + score // 80
     obstacle_delay = max(700, 1300 - score // 2)
 
-if score >= 500:
-    unlock_achievement("Where we going?")
-if score >= 1000:
-    unlock_achievement("Fingers of wood")
-if score >= 5000:
-    unlock_achievement("Fingers of steel")
-if score >= 10000:
-    unlock_achievement("Don't stop me now")
-if score >= 50000:
-    unlock_achievement("To infinity and beyond")
-if score >= 100000:
-    unlock_achievement("Need a drink?")
-if score >= 500000:
-    unlock_achievement("Well I'll be!")
-if score >= 1000000:
-    unlock_achievement("For the memes")
-if score >= 10000000:
-    unlock_achievement("Did it for big T")
+    # ACHIEVEMENTS
+    if score >= 500: unlock_achievement("Where we going?")
+    if score >= 1000: unlock_achievement("Fingers of wood")
+    if score >= 5000: unlock_achievement("Fingers of steel")
+    if score >= 10000: unlock_achievement("Don't stop me now")
+    if score >= 50000: unlock_achievement("To infinity and beyond")
+    if score >= 100000: unlock_achievement("Need a drink?")
+    if score >= 500000: unlock_achievement("Well I'll be!")
+    if score >= 1000000: unlock_achievement("For the memes")
+    if score >= 10000000: unlock_achievement("Did it for big T")
 
-if total_jumps >= 20:
-    unlock_achievement("Like a bunny")
-if total_jumps >= 200:
-    unlock_achievement("Could've jumped to space")
-if total_jumps >= 1000:
-    unlock_achievement("Even better than a bunny")
-if total_jumps >= 1000:
-    unlock_achievement("Hippity hoppity")
+    if total_jumps >= 20: unlock_achievement("Like a bunny")
+    if total_jumps >= 200: unlock_achievement("Could've jumped to space")
+    if total_jumps >= 1000:
+        unlock_achievement("Even better than a bunny")
+    if total_jumps >= 5000:
+        unlock_achievement("Hippity hoppity")
 
-if obstacles_dodged >= 10:
-    unlock_achievement("Reaction time")
-if obstacles_dodged >= 25:
-    unlock_achievement("Got it to a tee")
-if obstacles_dodged >= 100:
-    unlock_achievement("Way to be")
-if obstacles_dodged >= 1000:
-    unlock_achievement("Just a pro")
-if obstacles_dodged >= 10000:
-    unlock_achievement("How?")
+    if obstacles_dodged >= 10: unlock_achievement("Reaction time")
+    if obstacles_dodged >= 25: unlock_achievement("Got it to a tee")
+    if obstacles_dodged >= 100: unlock_achievement("Way to be")
+    if obstacles_dodged >= 1000: unlock_achievement("Just a pro")
+    if obstacles_dodged >= 10000: unlock_achievement("How?")
 
     # Draw
     draw_ground()
@@ -254,20 +236,13 @@ if obstacles_dodged >= 10000:
     draw_score()
     draw_achievements()
 
-    # Collision
     if check_collision():
         game_over()
         obstacles.clear()
+        achievement_messages.clear()
+        total_jumps = obstacles_dodged = 0
         player_y = ground_y - player_size
         player_vel_y = 0
-        jump_count = 0
-        total_jumps = 0
-        obstacles_dodged = 0
         start_ticks = pygame.time.get_ticks()
-        score = 0
-        game_speed = 7
-        bg_speed = 2
-        obstacle_delay = 1300
-        achievement_messages.clear()
 
     pygame.display.flip()
