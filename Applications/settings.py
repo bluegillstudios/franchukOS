@@ -9,7 +9,7 @@ from core.thememanage import apply_theme
 from PIL import Image, ImageTk
 
 
-OS_VERSION = "36.0.0 (Mitchell) - Stable Release"
+OS_VERSION = "37.0.0 (Teton) - Stable Release"
 
 class SettingsApp:
     def __init__(self):
