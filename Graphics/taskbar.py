@@ -223,7 +223,7 @@ class Taskbar(tk.Frame):
         games_menu.add_command(label="Aloha", command=self.launch_aloha)
         games_menu.add_command(label="Minesweeper", command=self.launch_mines)
         games_menu.add_command(label="Tetris", command=self.launch_tetris)
-        games_meniu.add_command(label="Runner", command=self.launch_runner)
+        games_menu.add_command(label="Runner", command=self.launch_runner)
         menu.add_cascade(label="Games", menu=games_menu)
 
         menu.add_separator()
