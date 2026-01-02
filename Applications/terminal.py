@@ -20,7 +20,6 @@ import subprocess
 import threading
 
 # --- FSL Integration ---
-from fsl import core as fsl_core
 from fsl import manager as fsl_manager
 from fsl import shell as fsl_shell
 

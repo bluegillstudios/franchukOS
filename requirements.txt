@@ -1,6 +1,8 @@
 psutil
+pygame
 pillow
 tkinterdnd2
+wheel
 playsound
 PyQt5
 PyQtWebEngine
