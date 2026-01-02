@@ -7,8 +7,6 @@ from PIL import Image, ImageTk, ImageFilter
 import os
 import pygame
 
-
-
 # ---- TRANSLATION DICTIONARY ----
 TRANSLATIONS = {
     "en": {
@@ -31,6 +29,7 @@ TRANSLATIONS = {
         "select_avatar": "Select Avatar Image",
         "avatar_preview": "Avatar Preview",
         "language": "Language",
+        "show_password": "Show Password",
     },
     "fr": {
         "title": "Connexion",
@@ -52,6 +51,7 @@ TRANSLATIONS = {
         "select_avatar": "Sélectionnez une image d'avatar",
         "avatar_preview": "Aperçu de l'avatar",
         "language": "Langue",
+        "show_password": "Afficher le mot de passe",
     },
     "es": {
         "title": "Iniciar sesión",
@@ -73,6 +73,7 @@ TRANSLATIONS = {
         "select_avatar": "Seleccionar imagen de avatar",
         "avatar_preview": "Vista previa del avatar",
         "language": "Idioma",
+        "show_password": "Mostrar contraseña",
     }
 }
 
@@ -134,6 +135,7 @@ class LoginApp:
         style.configure("TButton", background="#3b3b3b", foreground="white", relief="flat", font=("Segoe UI", 12))
         style.map("TButton", background=[("active", "#505050")])
         style.configure("TEntry", font=("Segoe UI", 12))
+        style.configure("TCheckbutton", background="#1c1c1c", foreground="white", font=("Segoe UI", 12))
 
         # Language selector
         lang_frame = ttk.Frame(self.root, style="Glass.TFrame")
@@ -173,6 +175,17 @@ class LoginApp:
         self.password_entry = ttk.Entry(container, show="*", width=30)
         self.password_entry.pack(pady=5)
 
+        # Show password checkbox
+        self.show_password_var = tk.BooleanVar(value=False)
+        show_password_check = ttk.Checkbutton(
+            container,
+            text=self.trans["show_password"],
+            variable=self.show_password_var,
+            command=self.toggle_password,
+            style="TCheckbutton"
+        )
+        show_password_check.pack(pady=2)
+
         self.login_button = ttk.Button(container, text=self.trans["login"], command=self.login)
         self.login_button.pack(pady=(15, 6), fill="x")
 
@@ -181,6 +194,12 @@ class LoginApp:
 
         self.root.bind("<Return>", lambda event: self.login())
         self.root.bind("<Escape>", lambda event: self.root.destroy())
+
+    def toggle_password(self):
+        if self.show_password_var.get():
+            self.password_entry.config(show="")
+        else:
+            self.password_entry.config(show="*")
 
     def on_language_change(self, code):
         self.language = code
