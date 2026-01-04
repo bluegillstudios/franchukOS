@@ -29,8 +29,10 @@ class Desktop(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Desktop")
-        self.geometry("1200x800")  
-        self.resizable(True, True)  
+
+        # Fullscreen by default now
+        self.attributes("-fullscreen", True)
+        self.bind("<Escape>", lambda e: self.attributes("-fullscreen", False))
 
         self.window_manager = WindowManager(self)
         self.taskbar = Taskbar(self)
