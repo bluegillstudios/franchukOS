@@ -91,7 +91,7 @@ class Terminal(tk.Toplevel):
             "arch": self.show_architecture,
             "python": self.run_python_interpreter,
             "help": self.show_help,
-            "version": lambda args: "FranchukOS version 35.0.0 (codenamed Catalina). Terminal version v1.2.5.",
+            "version": lambda args: "FranchukOS version 37.5.0 (codenamed Teton). Terminal version v1.2.5.",
             "rename": self.rename_file,
             "theme": self.set_theme_command,
             "debinstall": self.install_deb_package,
