@@ -12,7 +12,7 @@ from PyQt5.QtGui import (
     QFont, QSyntaxHighlighter, QTextCharFormat, QColor, QTextCursor, QPainter, QPalette, QIcon, QTextDocument
 )
 from PyQt5.QtCore import Qt, QTimer, QRegExp, QFileSystemWatcher, QSize
-import sys, os, subprocess
+import sys, os, subprocess, re, json, time
 
 class CodeHighlighter(QSyntaxHighlighter):
     def __init__(self, document):
@@ -184,6 +184,8 @@ class CodeEditor(QPlainTextEdit):
         }
         self.highlight_current_line()
         self._default_font_size = 13
+        # Create a highlighter per editor document
+        self.highlighter = CodeHighlighter(self.document())
 
     def line_number_area_width(self):
         digits = len(str(self.blockCount()))
@@ -248,7 +250,11 @@ class CodeEditor(QPlainTextEdit):
             font.setPointSize(size)
             self.setFont(font)
             self._default_font_size = size
-            self.line_number_area.editor.setFont(font)
+            # ensure line number area font matches
+            try:
+                self.line_number_area.editor.setFont(font)
+            except Exception:
+                pass
             self.update_line_number_area_width(0)
         else:
             super().wheelEvent(event)
@@ -258,7 +264,7 @@ class EditorTab(QWidget):
         super().__init__()
         self.layout = QVBoxLayout(self)
         self.text_edit = CodeEditor()
-        self.highlighter = CodeHighlighter(self.text_edit.document())
+        # highlighter is created inside CodeEditor now
         self.layout.addWidget(self.text_edit)
         self.setLayout(self.layout)
         self.file_path = None
@@ -267,10 +273,16 @@ class EditorTab(QWidget):
 
     def set_file_path(self, path):
         if self.file_path:
-            self.file_watcher.removePath(self.file_path)
+            try:
+                self.file_watcher.removePath(self.file_path)
+            except Exception:
+                pass
         self.file_path = path
         if path:
-            self.file_watcher.addPath(path)
+            try:
+                self.file_watcher.addPath(path)
+            except Exception:
+                pass
 
     def on_file_changed(self, path):
         reply = QMessageBox.question(self, "File Changed",
@@ -278,7 +290,7 @@ class EditorTab(QWidget):
             QMessageBox.Yes | QMessageBox.No)
         if reply == QMessageBox.Yes:
             try:
-                with open(path, 'r') as f:
+                with open(path, 'r', encoding='utf-8') as f:
                     self.text_edit.setPlainText(f.read())
             except Exception as e:
                 QMessageBox.warning(self, "Error", f"Could not reload file:\n{e}")
@@ -356,7 +368,6 @@ class SearchReplaceDialog(QDialog):
             count = text.count(search)
             new_text = text.replace(search, replace)
         else:
-            import re
             count = len(re.findall(re.escape(search), text, re.IGNORECASE))
             new_text = re.sub(re.escape(search), replace, text, flags=re.IGNORECASE)
         self.editor.setPlainText(new_text)
@@ -365,7 +376,7 @@ class SearchReplaceDialog(QDialog):
 class Birdseye(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Birdseye v5.2.0")
+        self.setWindowTitle("Birdseye v5.3.0")
         self.setGeometry(100, 100, 1280, 800)
         self.setWindowIcon(QIcon()) 
 
@@ -401,6 +412,7 @@ class Birdseye(QMainWindow):
         self.statusBar().setStyleSheet("color: #aaa; font-size: 12px;")
 
         self.recent_files = []
+        self.recent_limit = 10
 
         self.init_menu()
         self.autosave_timer = QTimer()
@@ -419,6 +431,7 @@ class Birdseye(QMainWindow):
 
         self.set_theme("Dark")
 
+        # create initial tab
         self.new_tab()
 
     def init_menu(self):
@@ -433,7 +446,7 @@ class Birdseye(QMainWindow):
         edit_menu.addAction(search_action)
 
         new_action = QAction("New", self)
-        new_action.triggered.connect(self.new_tab)
+        new_action.triggered.connect(lambda: self.new_tab())
         file_menu.addAction(new_action)
 
         open_action = QAction("Open", self)
@@ -497,7 +510,7 @@ class Birdseye(QMainWindow):
         QMessageBox.about(
             self,
             "About Birdseye",
-            "<b>Birdseye v5.2.0</b><br>"
+            "<b>Birdseye v5.3.0</b><br>"
             "A simple multi-language code editor for FranchukOS.<br><br>"
             "Copyright 2025 the FranchukOS project authors.<br>"
             "Licensed under the Apache License, Version 2.0.<br><br>"
@@ -505,12 +518,13 @@ class Birdseye(QMainWindow):
         )
 
     def set_language(self, lang):
-        editor = self.tabs.currentWidget()
-        if not editor:
+        editor_tab = self.tabs.currentWidget()
+        if not editor_tab:
             return
+        editor = editor_tab.text_edit
         if lang == "Auto":
-            if editor.file_path:
-                ext = os.path.splitext(editor.file_path)[1].lower()
+            if editor_tab.file_path:
+                ext = os.path.splitext(editor_tab.file_path)[1].lower()
                 if ext in [".py"]:
                     lang = "Python"
                 elif ext in [".cpp", ".cxx", ".cc", ".c", ".h", ".hpp"]:
@@ -652,66 +666,93 @@ class Birdseye(QMainWindow):
         else:
             self.file_tree.show()
 
-    def new_tab(self):
+    def new_tab(self, path=None):
         editor_tab = EditorTab()
-        self.tabs.addTab(editor_tab, "📝 Untitled")
+        if path:
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    editor_tab.text_edit.setPlainText(f.read())
+                editor_tab.set_file_path(path)
+                tab_label = f"📝 {os.path.basename(path)}"
+            except Exception as e:
+                QMessageBox.warning(self, "Error", f"Could not open file:\n{e}")
+                tab_label = "📝 Untitled"
+        else:
+            tab_label = "📝 Untitled"
+        self.tabs.addTab(editor_tab, tab_label)
         self.tabs.setCurrentWidget(editor_tab)
+        if path:
+            if path not in self.recent_files:
+                self.recent_files.insert(0, path)
+                self.recent_files = self.recent_files[:self.recent_limit]
+                self.update_recent_menu()
+        return editor_tab
 
     def open_file(self):
         fname, _ = QFileDialog.getOpenFileName(self, 'Open File', '', 'All Files (*);;Python Files (*.py);;C++ Files (*.cpp *.h);;C# Files (*.cs);;Rust Files (*.rs);;JavaScript Files (*.js)')
         if fname:
-            self.open_path(fname)
+            # open in a new tab (or focus existing)
+            for i in range(self.tabs.count()):
+                editor = self.tabs.widget(i)
+                if editor.file_path == fname:
+                    self.tabs.setCurrentIndex(i)
+                    return
+            self.new_tab(fname)
 
     def open_path(self, path):
+        # kept for compatibility with file tree open
+        self.open_file()  # this function now handled by open_file dialog; preserve but try to open path directly
+        # fallback: try to open directly like open_file would
         for i in range(self.tabs.count()):
             editor = self.tabs.widget(i)
             if editor.file_path == path:
                 self.tabs.setCurrentIndex(i)
                 return
-        editor_tab = EditorTab()
-        try:
-            with open(path, 'r') as f:
-                editor_tab.text_edit.setPlainText(f.read())
-            editor_tab.set_file_path(path)
-            self.tabs.addTab(editor_tab, f"📝 {os.path.basename(path)}")
-            self.tabs.setCurrentWidget(editor_tab)
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"Could not open file:\n{e}")
-        if path not in self.recent_files:
-            self.recent_files.insert(0, path)
-            self.recent_files = self.recent_files[:10]
+        self.new_tab(path)
 
     def open_from_tree(self, index):
         path = self.file_model.filePath(index)
         if os.path.isfile(path):
-            self.open_path(path)
+            # reuse new_tab logic
+            for i in range(self.tabs.count()):
+                editor = self.tabs.widget(i)
+                if editor.file_path == path:
+                    self.tabs.setCurrentIndex(i)
+                    return
+            self.new_tab(path)
 
     def save_file(self):
-        editor = self.tabs.currentWidget()
-        if not editor:
+        editor_tab = self.tabs.currentWidget()
+        if not editor_tab:
             return
-        if editor.file_path:
+        if editor_tab.file_path:
             try:
-                with open(editor.file_path, 'w') as f:
-                    f.write(editor.text_edit.toPlainText())
-                self.statusBar().showMessage(f"Saved {editor.file_path}", 3000)
+                with open(editor_tab.file_path, 'w', encoding='utf-8') as f:
+                    f.write(editor_tab.text_edit.toPlainText())
+                self.statusBar().showMessage(f"Saved {editor_tab.file_path}", 3000)
+                editor_tab.text_edit.document().setModified(False)
             except Exception as e:
                 QMessageBox.warning(self, "Error", f"Could not save file:\n{e}")
         else:
             self.save_as()
 
     def save_as(self):
-        editor = self.tabs.currentWidget()
-        if not editor:
+        editor_tab = self.tabs.currentWidget()
+        if not editor_tab:
             return
         fname, _ = QFileDialog.getSaveFileName(self, 'Save As', '', 'All Files (*)')
         if fname:
             try:
-                with open(fname, 'w') as f:
-                    f.write(editor.text_edit.toPlainText())
-                editor.set_file_path(fname)
+                with open(fname, 'w', encoding='utf-8') as f:
+                    f.write(editor_tab.text_edit.toPlainText())
+                editor_tab.set_file_path(fname)
                 self.tabs.setTabText(self.tabs.currentIndex(), f"📝 {os.path.basename(fname)}")
                 self.statusBar().showMessage(f"Saved {fname}", 3000)
+                # update recent files
+                if fname not in self.recent_files:
+                    self.recent_files.insert(0, fname)
+                    self.recent_files = self.recent_files[:self.recent_limit]
+                    self.update_recent_menu()
             except Exception as e:
                 QMessageBox.warning(self, "Error", f"Could not save file:\n{e}")
 
@@ -723,25 +764,43 @@ class Birdseye(QMainWindow):
             self.file_tree.show()
 
     def autosave_all(self):
+        # only autosave modified files to .autosave next to original
         for i in range(self.tabs.count()):
-            editor = self.tabs.widget(i)
-            if editor.file_path:
+            editor_tab = self.tabs.widget(i)
+            if editor_tab.file_path:
                 try:
-                    with open(editor.file_path, 'w') as f:
-                        f.write(editor.text_edit.toPlainText())
-                except:
+                    if editor_tab.text_edit.document().isModified():
+                        autosave_path = editor_tab.file_path + '.autosave'
+                        with open(autosave_path, 'w', encoding='utf-8') as f:
+                            f.write(editor_tab.text_edit.toPlainText())
+                except Exception:
                     pass
 
     def close_tab(self, index):
+        editor_tab = self.tabs.widget(index)
+        if editor_tab and editor_tab.text_edit.document().isModified():
+            reply = QMessageBox.question(self, "Save changes?", "Save changes before closing?", QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel)
+            if reply == QMessageBox.Yes:
+                # save current tab
+                self.tabs.setCurrentIndex(index)
+                self.save_file()
+            elif reply == QMessageBox.Cancel:
+                return
+        # remove watchers
+        try:
+            if editor_tab.file_path:
+                editor_tab.file_watcher.removePath(editor_tab.file_path)
+        except Exception:
+            pass
         self.tabs.removeTab(index)
 
     def show_git_status(self):
         # simple git status check
-        editor = self.tabs.currentWidget()
-        if not editor or not editor.file_path:
+        editor_tab = self.tabs.currentWidget()
+        if not editor_tab or not editor_tab.file_path:
             QMessageBox.information(self, "Git Status", "Open a file inside a git repo to check status.")
             return
-        repo_dir = os.path.dirname(editor.file_path)
+        repo_dir = os.path.dirname(editor_tab.file_path)
         try:
             output = subprocess.check_output(['git', '-C', repo_dir, 'status'], stderr=subprocess.STDOUT, universal_newlines=True)
             dlg = QMessageBox(self)
@@ -752,11 +811,11 @@ class Birdseye(QMainWindow):
             QMessageBox.warning(self, "Git Error", f"Git status failed:\n{e}")
 
     def git_commit(self):
-        editor = self.tabs.currentWidget()
-        if not editor or not editor.file_path:
+        editor_tab = self.tabs.currentWidget()
+        if not editor_tab or not editor_tab.file_path:
             QMessageBox.information(self, "Git Commit", "Open a file inside a git repo to commit.")
             return
-        repo_dir = os.path.dirname(editor.file_path)
+        repo_dir = os.path.dirname(editor_tab.file_path)
         text, ok = QInputDialog.getText(self, "Git Commit", "Enter commit message:")
         if ok and text:
             try:
@@ -881,23 +940,103 @@ class Birdseye(QMainWindow):
             self.apply_custom_theme()
 
     def apply_custom_theme(self):
-        # i'm too fucking tired to write shit right now, so this is a placeholder
-        pass
+        # Apply custom theme values to the application's stylesheet and palette
+        bg = self.custom_theme.get("Editor Background", "#272822")
+        text = self.custom_theme.get("Editor Text", "#f8f8f2")
+        tab_bg = self.custom_theme.get("Tab Background", "#1e1e1e")
+        tab_text = self.custom_theme.get("Tab Text", "#f8f8f2")
+        sidebar = self.custom_theme.get("Sidebar", "#1f1f1f")
+        sidebar_text = self.custom_theme.get("Sidebar Text", "#eeeeee")
+        highlight = self.custom_theme.get("Highlight", "#89ddff")
+
+        stylesheet = f"""
+            QPlainTextEdit, QTextEdit {{
+                background: {bg};
+                color: {text};
+                font-family: Consolas, monospace;
+                font-size: 14px;
+                border: none;
+            }}
+            QTabWidget::pane {{
+                border: 1px solid #444;
+                background: {tab_bg};
+            }}
+            QTabBar::tab {{
+                background: {tab_bg};
+                color: {tab_text};
+                border: 1px solid #555;
+                border-radius: 8px;
+                padding: 6px 14px;
+                margin-right: 4px;
+            }}
+            QTabBar::tab:selected {{
+                background: {bg};
+                border: 1px solid {highlight};
+            }}
+            QTreeView {{
+                background: {sidebar};
+                color: {sidebar_text};
+                font-size: 13px;
+                padding: 4px;
+            }}
+            QMenuBar, QMenu {{
+                background-color: {tab_bg};
+                color: {tab_text};
+                font-weight: bold;
+                font-size: 13px;
+            }}
+            QPushButton {{
+                background: {tab_bg};
+                color: {tab_text};
+                border-radius: 6px;
+                padding: 6px 14px;
+            }}
+            QPushButton:hover {{
+                background: {highlight};
+            }}
+        """
+        self.setStyleSheet(stylesheet)
+        pal = QApplication.instance().palette()
+        try:
+            pal.setColor(QPalette.Window, QColor(bg))
+            pal.setColor(QPalette.Base, QColor(bg))
+            pal.setColor(QPalette.Text, QColor(text))
+            pal.setColor(QPalette.Highlight, QColor(highlight))
+            pal.setColor(QPalette.HighlightedText, QColor("#000000"))
+            QApplication.instance().setPalette(pal)
+        except Exception:
+            pass
+        self.statusBar().showMessage("Applied custom theme", 3000)
 
     def run_current_file(self):
-        editor = self.tabs.currentWidget()
-        if not editor or not editor.file_path:
+        editor_tab = self.tabs.currentWidget()
+        if not editor_tab or not editor_tab.file_path:
             QMessageBox.information(self, "Run", "Save the file before running.")
             return
-        ext = os.path.splitext(editor.file_path)[1].lower()
+        # ensure file saved
+        if editor_tab.text_edit.document().isModified():
+            # prompt or auto-save
+            try:
+                with open(editor_tab.file_path, 'w', encoding='utf-8') as f:
+                    f.write(editor_tab.text_edit.toPlainText())
+                editor_tab.text_edit.document().setModified(False)
+            except Exception as e:
+                QMessageBox.warning(self, "Run", f"Could not save file:\n{e}")
+                return
+
+        ext = os.path.splitext(editor_tab.file_path)[1].lower()
         cmd = None
         if ext == ".py":
-            cmd = ["python", editor.file_path]
+            cmd = ["python", editor_tab.file_path]
+        elif ext == ".js":
+            cmd = ["node", editor_tab.file_path]
+        elif ext == ".sh":
+            cmd = ["bash", editor_tab.file_path]
         elif ext == ".java":
             # Compile then run
-            dir_path = os.path.dirname(editor.file_path)
-            base = os.path.splitext(os.path.basename(editor.file_path))[0]
-            compile_cmd = ["javac", editor.file_path]
+            dir_path = os.path.dirname(editor_tab.file_path)
+            base = os.path.splitext(os.path.basename(editor_tab.file_path))[0]
+            compile_cmd = ["javac", editor_tab.file_path]
             run_cmd = ["java", "-cp", dir_path, base]
             try:
                 subprocess.check_call(compile_cmd)
@@ -906,8 +1045,8 @@ class Birdseye(QMainWindow):
                 QMessageBox.warning(self, "Run", f"Java compilation failed:\n{e}")
                 return
         elif ext in [".cpp", ".cxx", ".cc"]:
-            exe_path = os.path.splitext(editor.file_path)[0] + ".exe"
-            compile_cmd = ["g++", editor.file_path, "-o", exe_path]
+            exe_path = os.path.splitext(editor_tab.file_path)[0] + ".exe"
+            compile_cmd = ["g++", editor_tab.file_path, "-o", exe_path]
             try:
                 subprocess.check_call(compile_cmd)
                 cmd = [exe_path]
@@ -915,7 +1054,7 @@ class Birdseye(QMainWindow):
                 QMessageBox.warning(self, "Run", f"C++ compilation failed:\n{e}")
                 return
         else:
-            QMessageBox.information(self, "Run", "Running is only supported for Python, Java, and C++ files.")
+            QMessageBox.information(self, "Run", "Running is only supported for Python, JavaScript, Shell, Java, and C++ files.")
             return
         try:
             output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, universal_newlines=True)
@@ -931,20 +1070,20 @@ class Birdseye(QMainWindow):
             self.recent_menu.addAction(action)
 
     def update_status_bar(self):
-        editor = self.tabs.currentWidget()
-        if not editor:
+        editor_tab = self.tabs.currentWidget()
+        if not editor_tab:
             self.statusBar().clearMessage()
             return
-        text = editor.text_edit.toPlainText()
+        text = editor_tab.text_edit.toPlainText()
         lines = text.count('\n') + 1
         words = len(text.split())
         self.statusBar().showMessage(f"Lines: {lines} | Words: {words}")
 
     def open_search_replace(self):
-        editor = self.tabs.currentWidget()
-        if not editor:
+        editor_tab = self.tabs.currentWidget()
+        if not editor_tab:
             return
-        dlg = SearchReplaceDialog(self, editor.text_edit)
+        dlg = SearchReplaceDialog(self, editor_tab.text_edit)
         dlg.exec_()
 
 def main():
