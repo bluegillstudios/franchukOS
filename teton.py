@@ -13,7 +13,7 @@ from colorama import init, Fore
 import os
 
 init()
-print(Fore.RED + 'BM: STABLE BUILD, M37. REV182')
+print(Fore.RED + 'BM: STABLE BUILD, 37.5 REV190')
 time.sleep(0.25)
 print(Fore.RESET + '[    2.8351] I/QTTranslations: Loaded translation file for language EN.')
 time.sleep(0.05)

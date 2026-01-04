@@ -24,14 +24,11 @@ import random
 import itertools
 import os
 
-
 class Desktop(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Desktop")
-
         # Fullscreen by default now
-        self.attributes("-fullscreen", True)
         self.bind("<Escape>", lambda e: self.attributes("-fullscreen", False))
 
         self.window_manager = WindowManager(self)
@@ -66,7 +63,9 @@ class Desktop(tk.Tk):
         self.bind_all("<Motion>", self.reset_screensaver_timer)
         self.start_screensaver_timer()
 
-    # Wallpaper shit 
+        # Panic 
+        self.start_kernel_panic()
+ 
     def poll_wallpaper_config(self):
         def watcher():
             while True:
@@ -95,7 +94,6 @@ class Desktop(tk.Tk):
             self.wallpaper_animating = False
 
             if os.path.isdir(path):
-                # Slideshow mode
                 images = [os.path.join(path, f) for f in os.listdir(path) if f.lower().endswith((".jpg", ".png"))]
                 if not images:
                     raise FileNotFoundError("No valid images in slideshow folder")
@@ -104,7 +102,6 @@ class Desktop(tk.Tk):
                 return
 
             img = Image.open(path)
-
             if getattr(img, "is_animated", False):  
                 self.wallpaper_frames = [ImageTk.PhotoImage(frame.resize(
                     (self.winfo_screenwidth(), self.winfo_screenheight()), Image.LANCZOS)) 
@@ -117,7 +114,6 @@ class Desktop(tk.Tk):
                 self.animate_wallpaper()
                 return
 
-            # Static image
             img = img.resize((self.winfo_screenwidth(), self.winfo_screenheight()), Image.LANCZOS)
             self.wallpaper_photo = ImageTk.PhotoImage(img)
             if self.wallpaper_label:
@@ -129,7 +125,7 @@ class Desktop(tk.Tk):
         except Exception as e:
             print(f"Could not load wallpaper from {path}: {e}")
             self.configure(bg="black")
-    # maybe we can expand this later to support more formats like gifs and videos
+
     def animate_wallpaper(self):
         if not self.wallpaper_animating or not self.wallpaper_frames:
             return
@@ -155,11 +151,9 @@ class Desktop(tk.Tk):
             print(f"Slideshow error: {e}")
         self.after(8000, self.animate_slideshow)  
 
-    # Ok now UI stuff 
     def setup_ui(self):
         self.icon_container = tk.Frame(self, bg="", bd=0)
         self.icon_container.place(relx=0, rely=0)
-        # We still have this because the code breaks when we remove it. It's useless. What the fuck is going on?
         apps = [
             ("Terminal", "assets/icons/apps/terminal.png", Terminal),
             ("File Explorer", "assets/icons/apps/files.png", FileExplorer),
@@ -231,7 +225,6 @@ class Desktop(tk.Tk):
         self.screensaver_window.bind("<Any-Button>", self.reset_screensaver_timer)
         self.screensaver_window.bind("<Motion>", self.reset_screensaver_timer)
 
-        # GIF support holy shit
         try:
             gif = Image.open("Assets/screensavers/fractal.gif")
             frames = [ImageTk.PhotoImage(frame.copy().resize(
@@ -248,42 +241,146 @@ class Desktop(tk.Tk):
             animate()
         except Exception as e:
             print(f"Screensaver GIF error: {e}")
-            tk.Label(self.screensaver_window, text="Franchuk is waiting. Don't leave him alone.", # Is this a threat?
+            tk.Label(self.screensaver_window, text="Franchuk is waiting. Don't leave him alone.",
                      fg="white", bg="black", font=("Segoe UI", 48)).pack(expand=True)
             
-    # Do not go gentle into that good night,
-    # Old age should burn and rave at close of day;
-    # Rage, rage against the dying of the light.
-    #
-    # Though wise men at their end know dark is right,
-    # Because their words had forked no lightning they
-    # Do not go gentle into that good night.
-    #
-    # Good men, the last wave by, crying how bright
-    # Their frail deeds might have danced in a green bay,
-    # Rage, rage against the dying of the light.
-    #
-    # Wild men who caught and sang the sun in flight,
-    # And learn, too late, they grieved it on its way,
-    # Do not go gentle into that good night.
-    #
-    # Grave men, near death, who see with blinding sight
-    # Blind eyes could blaze like meteors and be gay,
-    # Rage, rage against the dying of the light.
-    #
-    # And you, my father, there on the sad height,
-    # Curse, bless, me now with your fierce tears, I pray.
-    # Do not go gentle into that good night.
-    # Rage, rage against the dying of the light.
-
-    # Rage against the dying of the light screensaver
-
     def deactivate_screensaver(self, event=None):
         if self.screensaver_window:
             self.screensaver_window.destroy()
             self.screensaver_window = None
         self.screensaver_active = False
         self.last_activity = time.time()
+
+    def start_kernel_panic(self):
+        def panic_thread():
+            while True:
+                if random.randint(1, 10000) == 1 and not hasattr(self, "panic_active"):
+                    self.after(0, self.show_kernel_panic_screen)
+                time.sleep(1)
+        threading.Thread(target=panic_thread, daemon=True).start()
+
+    def hex(self, length):
+        return "0x" + "".join(random.choice("0123456789ABCDEF") for _ in range(length))
+
+    def registers(self):
+        return {
+            "dtrace1": self.hex(16),
+            "dtrace2": self.hex(16),
+            "backtrace1": self.hex(16),
+            "backtrace2": self.hex(16),
+            "backtrace3": self.hex(16),
+            "backtrace4": self.hex(16),
+            "dtrace3": self.hex(16),
+            "FLAGS": self.hex(8),
+            "CRASH_ADDR": self.hex(12)
+        }
+
+    def panic_reason(self):
+        return random.choice([
+            "PAGE_FAULT_IN_NONPAGED_AREA",
+            "INVALID_KERNEL_EXECUTION",
+            "STACK_BUFFER_OVERRUN",
+            "GENERAL_PROTECTION_FAULT",
+            "NULL_POINTER_DEREFERENCE",
+            "SCHEDULER_CORRUPTION"
+        ])
+
+    def show_kernel_panic_screen(self):
+        self.panic_active = True
+
+        regs = self.registers()
+        reason = self.panic_reason()
+
+        panic = tk.Toplevel(self)
+        panic.attributes("-fullscreen", True)
+        panic.attributes("-topmost", True)
+        panic.overrideredirect(True)
+        panic.configure(bg="#050505")
+
+        panic.grab_set()
+        panic.focus_force()
+
+        container = tk.Frame(panic, bg="#050505")
+        container.pack(expand=True, fill="both", padx=60, pady=40)
+
+        # ASCII mascot
+        ascii_mascot = r"""
+                    :;ittt+;                .;=tXRRBBBBBRVt;  
+                ;tRBMMMMMMMMBV;           ;tBMMMMMBBMMMMMMMMt 
+             ;YBMMMBRXYXVRBMMMMBIVBBMBBBBMMMMBRI=iRBMMBRiRMMB 
+          ;IBMMBX=:        YBMMMMMMMBBBMMMB+. .iBMMBX;   ;MMV 
+        .RMMMB;             ;BMMMBi:   tMM: ;XBMBI;      .MMt 
+       ;BMMMM+               RMMM;      BMYBBRi:         ;MM= 
+      iBiRMMB                BMMR      +BMMV             iMM: 
+     VY  :BMM:              ;MMM=     VMMMMB             RMB  
+   :BR    YMMY             .BMMB    ;BMBI;BMX           RMMi  
+  =BB:    .BMB:           :BMMB;    BMMt  ;BMR.       ;BMMB   
+ iMMR      tMMB.         ;BMB+.    +MMR    ;BMBY: :;IBMMMB.   
+:BMM;       RBMB;     :tBMMB;      BMR      ;BMMMMMMMMMR;     
+YMMR          ;iRBRRBBMMBV;        ;;         ;iXRRRI;.       
+VMB.              ;tYt;:                                      
+:R:
+"""
+        tk.Label(container, text=ascii_mascot, fg="#ff5555", bg="#050505",
+                 font=("Consolas", 12), justify="left").pack(anchor="w", pady=(0, 20))
+
+        tk.Label(container, text="Uh oh. Kernel panic.", fg="#ff5555", bg="#050505",
+                 font=("Consolas", 42, "bold")).pack(anchor="w")
+
+        tk.Label(container, text=f"STOP CODE: {reason}", fg="white", bg="#050505",
+                 font=("Consolas", 18)).pack(anchor="w", pady=(0, 25))
+
+        tk.Label(container, text="CPU REGISTERS:", fg="#aaaaaa", bg="#050505",
+                 font=("Consolas", 16, "bold")).pack(anchor="w")
+
+        reg_dump = "\n".join(f"{k:<12} {v}" for k, v in regs.items())
+        tk.Label(container, text=reg_dump, fg="#dddddd", bg="#050505",
+                 font=("Consolas", 14), justify="left").pack(anchor="w", pady=(0, 30))
+
+        qr_frame = tk.Frame(container, bg="#050505")
+        qr_frame.pack(anchor="w")
+
+        try:
+            qr_img = Image.open("Assets/panic/qr.png").resize((180, 180), Image.LANCZOS)
+            qr_photo = ImageTk.PhotoImage(qr_img)
+            qr = tk.Label(qr_frame, image=qr_photo, bg="#050505")
+            qr.image = qr_photo
+            qr.pack(side="left")
+        except Exception as e:
+            print(f"QR error: {e}")
+
+        tk.Label(qr_frame,
+                 text=(
+                     "The system has been halted due to an unsafe process. The operating system needs to be restarted.\n\n"
+                     "A crash dump has been written.\n\n"
+                     "Scan the QR code for support\n"
+                     "or visit: franchukos.local/panic\n\n"
+                     f"Uptime: {random.randint(120, 10000)} seconds"
+                 ),
+                 fg="#cccccc", bg="#050505", font=("Consolas", 14), justify="left").pack(side="left", padx=30)
+
+        progress = tk.Label(container, text="Collecting diagnostic data… 0%", fg="#888888",
+                            bg="#050505", font=("Consolas", 14))
+        progress.pack(anchor="w", pady=(30, 0))
+
+        def animate(p=0):
+            if not self.panic_active:
+                return
+            if p <= 100:
+                progress.config(text=f"Collecting diagnostic data… {p}%")
+                panic.after(random.randint(80, 200), animate, p + random.randint(1, 5))
+
+        animate()
+        panic.bind("<Control-Alt-r>", lambda e: self._clear_kernel_panic(panic))
+
+    def _clear_kernel_panic(self, panic_window):
+        try:
+            panic_window.grab_release()
+            panic_window.destroy()
+        except:
+            pass
+        if hasattr(self, "panic_active"):
+            del self.panic_active
 
 
 if __name__ == "__main__":

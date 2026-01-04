@@ -2,10 +2,20 @@
 # Contributed under the Apache License, Version 2.0.
 
 import sys
+import threading
+import datetime
+import tempfile
+import shutil
+try:
+    import keyring  # optional; used for secure passphrase storage if available
+    _HAS_KEYRING = True
+except Exception:
+    _HAS_KEYRING = False
+
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtWebEngineWidgets import *
-from PyQt5.QtWebEngineWidgets import QWebEngineDownloadItem
+from PyQt5.QtWebEngineWidgets import QWebEngineDownloadItem, QWebEngineProfile, QWebEngineSettings
 from PyQt5.QtGui import QIcon, QPalette, QColor, QFontMetrics, QKeySequence
 from PyQt5.QtWidgets import QStyle, QProxyStyle, QShortcut
 from PyQt5.QtPrintSupport import QPrinter
@@ -18,14 +28,39 @@ import random
 import platform
 import psutil
 
-FRANNY_VERSION = "v21.0.0"
+FRANNY_VERSION = "v21.1"
 
-BOOKMARKS_PATH = "config/bookmarks.json"
-HISTORY_PATH = "config/history.json"
+BOOKMARKS_PATH = "frannyconfig/bookmarks.json"
+HISTORY_PATH = "frannyconfig/history.json"
+SYNC_CONFIG_PATH = "frannyconfig/sync.json"
+
+# --- Worker/Signals for running sync off the UI thread ---
+class SyncWorkerSignals(QObject):
+    message = pyqtSignal(str)
+    finished = pyqtSignal(bool, str)  # success, message
+
+class SyncWorker(QRunnable):
+    def __init__(self, fn, *args, **kwargs):
+        super().__init__()
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+        self.signals = SyncWorkerSigns = SyncWorkerSignals()
+
+    def run(self):
+        try:
+            result = self.fn(*self.args, **self.kwargs)
+            # result is expected to be (success: bool, message: str)
+            if isinstance(result, tuple) and len(result) >= 2:
+                ok, msg = result[0], result[1]
+                self.signals.finished.emit(ok, msg)
+            else:
+                self.signals.finished.emit(True, "Sync completed.")
+        except Exception as e:
+            self.signals.finished.emit(False, f"Sync worker error: {e}")
 
 class ChromiumTabStyle(QProxyStyle):
     # A custom style to tweak tab size and margins for a Chromium look. 
-    # Doesn't it look awesome????? Right Max?
     def subControlRect(self, control, option, subControl, widget=None):
         rect = super().subControlRect(control, option, subControl, widget)
         if control == QStyle.CC_TabBar and subControl == QStyle.SC_TabBarTab:
@@ -49,6 +84,22 @@ class BrowserTab(QWebEngineView):
             "Franny/19.0.910"
         )
         profile.setHttpUserAgent(custom_agent)
+
+        # If parent requests incognito, try to limit persistent storage
+        try:
+            if parent and getattr(parent, "incognito", False):
+                # Disable LocalStorage and other persistent features
+                self.settings().setAttribute(QWebEngineSettings.LocalStorageEnabled, False)
+                profile.setPersistentCookiesPolicy(QWebEngineProfile.NoPersistentCookies)
+                profile.setHttpCacheType(QWebEngineProfile.MemoryHttpCache)
+                # Avoid setting a persistent storage path
+                try:
+                    profile.setPersistentStoragePath("")
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
         self.setUrl(QUrl("https://www.google.com"))
         self.page().fullScreenRequested.connect(self.handle_fullscreen_request)
 
@@ -214,10 +265,11 @@ class GroupedTabBar(QTabBar):
             painter.drawControl(QStyle.CE_TabBarTab, opt)
 
 class FrannyBrowser(QMainWindow):
-    def __init__(self):
+    def __init__(self, incognito=False):
         super().__init__()
 
-        self.setWindowTitle(f"Franny ({FRANNY_VERSION})")  
+        self.incognito = incognito
+        self.setWindowTitle(f"Franny ({FRANNY_VERSION})" + (" [Incognito]" if self.incognito else ""))
 
         self.tabs = QTabWidget(self)
         self.tabs.setTabsClosable(True)
@@ -271,14 +323,25 @@ class FrannyBrowser(QMainWindow):
         self.init_shortcuts()
         self.init_bookmarks_bar()
 
+        # Load sync settings and possibly start auto-sync
+        self.load_sync_settings()
+        if getattr(self, "sync_enabled", False):
+            # default interval 10 minutes
+            self.start_auto_sync(interval_minutes=10)
+
         self.status_bar = QStatusBar(self)
         self.setStatusBar(self.status_bar)
 
-        self.add_new_tab(QUrl("https://www.google.com"), "New Tab")
+        # Initial tab: respect incognito flag
+        if self.incognito:
+            self.add_new_tab(QUrl("about:blank"), "New Tab")
+        else:
+            self.add_new_tab(QUrl("https://www.google.com"), "New Tab")
 
         self.tabs.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tabs.customContextMenuRequested.connect(self.show_tab_context_menu)
 
+    # ---------- toolbar/menu/bookmarks/etc (unchanged) ----------
     def init_toolbar(self):
         self.toolbar = QToolBar("Navigation", self)
         self.toolbar.setIconSize(QSize(28, 28))
@@ -348,7 +411,6 @@ class FrannyBrowser(QMainWindow):
     def init_menu(self):
         menu_bar = self.menuBar()
 
-        
         file_menu = menu_bar.addMenu("Tabs and Modes")
         new_tab_action = QAction("New Tab", self)
         new_tab_action.triggered.connect(self.new_tab)
@@ -469,6 +531,7 @@ class FrannyBrowser(QMainWindow):
             action.triggered.connect(lambda checked, u=url: self.add_new_tab(QUrl(u), u))
             self.bookmarks_bar.addAction(action)
 
+    # ---------- tabs ----------
     def add_new_tab(self, qurl=None, label="New Tab"):
         # Special Franny URLs
         if qurl and qurl.toString().startswith("franny://"):
@@ -487,7 +550,7 @@ class FrannyBrowser(QMainWindow):
                 self.tabs.setCurrentIndex(i)
                 return
             elif url_str == "franny://newtab":
-                super().add_new_tab(QUrl("https://www.google.com"), "New Tab")
+                self.add_new_tab(QUrl("https://www.google.com"), "New Tab")
                 return
             elif url_str == "franny://mem":
                 widget = QWidget()
@@ -501,8 +564,22 @@ class FrannyBrowser(QMainWindow):
                 i = self.tabs.addTab(widget, "Memory")
                 self.tabs.setCurrentIndex(i)
                 return
-        # ...existing code for normal tabs...
+        # Normal tabs
         browser = BrowserTab(self)
+        # If this browser is created for an incognito window, ensure its profile/settings are limited.
+        if getattr(self, "incognito", False):
+            try:
+                browser.settings().setAttribute(QWebEngineSettings.LocalStorageEnabled, False)
+                p = browser.page().profile()
+                p.setPersistentCookiesPolicy(QWebEngineProfile.NoPersistentCookies)
+                p.setHttpCacheType(QWebEngineProfile.MemoryHttpCache)
+                try:
+                    p.setPersistentStoragePath("")
+                except Exception:
+                    pass
+            except Exception:
+                pass
+
         browser.setUrl(qurl or QUrl("https://www.google.com"))
         i = self.tabs.addTab(browser, label)
         self.tabs.setCurrentIndex(i)
@@ -520,8 +597,14 @@ class FrannyBrowser(QMainWindow):
     def close_tab(self, index):
         if self.tabs.count() > 1:
             browser = self.tabs.widget(index)
-            url = browser.url()
-            title = browser.title()
+            try:
+                url = browser.url()
+            except Exception:
+                url = QUrl()
+            try:
+                title = browser.title()
+            except Exception:
+                title = "New Tab"
             self.closed_tabs.append((url, title))
             self.tabs.removeTab(index)
             browser.deleteLater()  # Free resources
@@ -556,36 +639,55 @@ class FrannyBrowser(QMainWindow):
     def update_address_bar(self, index):
         browser = self.tabs.widget(index)
         if browser:
-            url = browser.url().toString()
-            self.address_bar.setText(url)
-            if url.startswith("https://"):
-                self.status_bar.showMessage("Secure connection (HTTPS)")
-            elif url.startswith("http://"):
-                self.status_bar.showMessage("Not secure (HTTP)")
-            elif url.startswith("ssh://"):
-                self.status_bar.showMessage("SSH protocol detected")
-            else:
-                self.status_bar.clearMessage()
+            try:
+                url = browser.url().toString()
+                self.address_bar.setText(url)
+                if url.startswith("https://"):
+                    self.status_bar.showMessage("Secure connection (HTTPS)")
+                elif url.startswith("http://"):
+                    self.status_bar.showMessage("Not secure (HTTP)")
+                elif url.startswith("ssh://"):
+                    self.status_bar.showMessage("SSH protocol detected")
+                else:
+                    self.status_bar.clearMessage()
+            except Exception:
+                pass
 
     def navigate_to_url(self):
         url = QUrl(self.address_bar.text())
         if url.scheme() == "":
             url.setScheme("http")
-        self.current_browser().setUrl(url)
+        try:
+            self.current_browser().setUrl(url)
+        except Exception:
+            pass
 
     def go_home(self):
-        self.current_browser().setUrl(QUrl("https://www.google.com"))
+        try:
+            self.current_browser().setUrl(QUrl(getattr(self, "homepage", "https://www.google.com")))
+        except Exception:
+            pass
 
     def update_history(self, url):
-        self.history.append(url.toString())
-        self.save_history()
-        self.status_bar.showMessage(f"Visited: {url.toString()}")
+        try:
+            self.history.append(url.toString())
+            self.save_history()
+            self.status_bar.showMessage(f"Visited: {url.toString()}")
+        except Exception:
+            pass
 
     def toggle_incognito(self):
-        current_browser = self.current_browser()
-        if current_browser:
-            current_browser.setUrl(QUrl("about:blank"))
-            self.status_bar.showMessage("Incognito Mode Enabled")
+        # Open a new window in incognito mode so the current window remains intact.
+        try:
+            wnd = FrannyBrowser(incognito=True)
+            # Keep a reference so it isn't garbage collected
+            if not hasattr(self, "_child_windows"):
+                self._child_windows = []
+            self._child_windows.append(wnd)
+            wnd.show()
+            self.status_bar.showMessage("Opened Incognito Window")
+        except Exception as e:
+            self.status_bar.showMessage(f"Failed to open incognito window: {e}")
 
     def show_bookmarks(self):
         bookmarks = self.load_bookmarks()
@@ -608,15 +710,19 @@ class FrannyBrowser(QMainWindow):
         bookmark_dialog.exec_()
 
     def add_bookmark(self):
-        current_url = self.current_browser().url().toString()
+        current_url = ""
+        try:
+            current_url = self.current_browser().url().toString()
+        except Exception:
+            pass
         bookmarks = self.load_bookmarks()
-        if current_url not in bookmarks:
+        if current_url and current_url not in bookmarks:
             bookmarks.append(current_url)
             self.save_bookmarks(bookmarks)
             self.status_bar.showMessage(f"Bookmark added: {current_url}")
             self.update_bookmarks_bar()
         else:
-            self.status_bar.showMessage("This page is already bookmarked.")
+            self.status_bar.showMessage("This page is already bookmarked or invalid.")
 
     def remove_bookmark(self, url):
         bookmarks = self.load_bookmarks()
@@ -631,19 +737,22 @@ class FrannyBrowser(QMainWindow):
     def load_bookmarks(self):
         if os.path.exists(BOOKMARKS_PATH):
             with open(BOOKMARKS_PATH, "r") as file:
-                return json.load(file)
+                try:
+                    return json.load(file)
+                except Exception:
+                    return []
         return []
 
     def save_bookmarks(self, bookmarks):
+        os.makedirs(os.path.dirname(BOOKMARKS_PATH) or ".", exist_ok=True)
         with open(BOOKMARKS_PATH, "w") as file:
             json.dump(bookmarks, file)
-    # Save browsing history to a JSON file
+
     def save_history(self):
-        os.makedirs(os.path.dirname(HISTORY_PATH), exist_ok=True)  # Ensure the config directory exists
+        os.makedirs(os.path.dirname(HISTORY_PATH) or ".", exist_ok=True)  # Ensure the config directory exists
         with open(HISTORY_PATH, "w") as file:
             json.dump(self.history, file)
             
-    # This fucked franny and we never knew? Cool
     def load_history(self):
         if os.path.exists(HISTORY_PATH):
             try:
@@ -657,23 +766,35 @@ class FrannyBrowser(QMainWindow):
         return []
 
     def clear_data(self):
-        self.history.clear()
-        self.save_history()
-        self.current_browser().page().profile().clearHttpCache()
-        self.status_bar.showMessage("Browsing data cleared.")
+        try:
+            self.history.clear()
+            self.save_history()
+            self.current_browser().page().profile().clearHttpCache()
+            self.status_bar.showMessage("Browsing data cleared.")
+        except Exception:
+            pass
 
     def zoom_in(self):
         self.zoom_level += 0.1
-        self.current_browser().setZoomFactor(self.zoom_level)
+        try:
+            self.current_browser().setZoomFactor(self.zoom_level)
+        except Exception:
+            pass
 
     def zoom_out(self):
         self.zoom_level -= 0.1
-        self.current_browser().setZoomFactor(self.zoom_level)
+        try:
+            self.current_browser().setZoomFactor(self.zoom_level)
+        except Exception:
+            pass
 
     def find_in_page(self):
         search_text, ok = QInputDialog.getText(self, "Find in Page", "Enter text to find:")
         if ok and search_text:
-            self.current_browser().findText(search_text, QWebEnginePage.FindFlags(QWebEnginePage.FindCaseSensitively))
+            try:
+                self.current_browser().findText(search_text, QWebEnginePage.FindFlags(QWebEnginePage.FindCaseSensitively))
+            except Exception:
+                pass
 
     def import_bookmarks(self):
         path, _ = QFileDialog.getOpenFileName(self, "Import Bookmarks", "", "JSON Files (*.json)")
@@ -702,48 +823,7 @@ class FrannyBrowser(QMainWindow):
             except Exception as e:
                 self.status_bar.showMessage(f"Export failed: {e}")
 
-    def add_new_tab(self, qurl=None, label="New Tab"):
-        # Special Franny URLs
-        if qurl and qurl.toString().startswith("franny://"):
-            url_str = qurl.toString()
-            if url_str == "franny://version":
-                widget = QWidget()
-                layout = QVBoxLayout()
-                layout.addWidget(QLabel(f"Franny Version: {FRANNY_VERSION}"))
-                layout.addWidget(QLabel(f"Python: {platform.python_version()}"))
-                layout.addWidget(QLabel(f"Qt: {QT_VERSION_STR}"))
-                widget.setLayout(layout)
-                i = self.tabs.addTab(widget, "Version")
-                self.tabs.setCurrentIndex(i)
-                return
-            elif url_str == "franny://newtab":
-                super().add_new_tab(QUrl("https://www.google.com"), "New Tab")
-                return
-            elif url_str == "franny://mem":
-                widget = QWidget()
-                layout = QVBoxLayout()
-                process = psutil.Process(os.getpid())
-                mem_info = process.memory_info()
-                layout.addWidget(QLabel(f"Memory Usage: {mem_info.rss // (1024*1024)} MB"))
-                layout.addWidget(QLabel(f"Peak Memory: {mem_info.vms // (1024*1024)} MB"))
-                layout.addWidget(QLabel(f"System Memory: {psutil.virtual_memory().percent}% used"))
-                widget.setLayout(layout)
-                i = self.tabs.addTab(widget, "Memory")
-                self.tabs.setCurrentIndex(i)
-                return
-        # ...existing code for normal tabs...
-        browser = BrowserTab(self)
-        browser.setUrl(qurl or QUrl("https://www.google.com"))
-        i = self.tabs.addTab(browser, label)
-        self.tabs.setCurrentIndex(i)
-        browser.urlChanged.connect(lambda url, b=browser: self.update_tab_title(url, b))
-        browser.urlChanged.connect(self.update_history)
-        browser.titleChanged.connect(lambda title, b=browser: self.tabs.setTabText(self.tabs.indexOf(b), title))
-        browser.iconChanged.connect(lambda icon, b=browser: self.tabs.setTabIcon(self.tabs.indexOf(b), icon))
-        browser.loadFinished.connect(lambda: self.update_address_bar(self.tabs.currentIndex()))
-        browser.page().profile().downloadRequested.connect(self.handle_download_requested)
-        self.update_tab_group_styles()
-
+    # ---------- downloads ----------
     def handle_download_requested(self, download: QWebEngineDownloadItem):
         save_path, _ = QFileDialog.getSaveFileName(self, "Save File", download.path())
         if save_path:
@@ -786,6 +866,7 @@ class FrannyBrowser(QMainWindow):
     def update_download_manager(self):
         pass
 
+    # ---------- shortcuts ----------
     def init_shortcuts(self):
         QShortcut(QKeySequence("Ctrl+Tab"), self, activated=self.next_tab)
         QShortcut(QKeySequence("Ctrl+Shift+Tab"), self, activated=self.prev_tab)
@@ -795,6 +876,11 @@ class FrannyBrowser(QMainWindow):
         QShortcut(QKeySequence("Ctrl++"), self, activated=self.zoom_in)
         QShortcut(QKeySequence("Ctrl+-"), self, activated=self.zoom_out)
         QShortcut(QKeySequence("Ctrl+Shift+F"), self, activated=self.search_tabs)
+
+        # Theme shortcuts from v21.1: Ctrl+Shift+1..N to switch themes
+        for i, theme_name in enumerate(THEMES.keys(), start=1):
+            # bind theme_name as default argument to avoid late-binding trap
+            QShortcut(QKeySequence(f"Ctrl+Shift+{i}"), self, activated=(lambda t=theme_name: apply_theme(QApplication.instance(), t)))
 
     def next_tab(self):
         idx = self.tabs.currentIndex()
@@ -806,6 +892,7 @@ class FrannyBrowser(QMainWindow):
         count = self.tabs.count()
         self.tabs.setCurrentIndex((idx - 1) % count)
 
+    # ---------- tab grouping ----------
     def show_tab_context_menu(self, pos):
         index = self.tabs.tabBar().tabAt(pos)
         if index == -1:
@@ -852,6 +939,7 @@ class FrannyBrowser(QMainWindow):
                 self.tabs.tabBar().setTabData(idx, None)
         self.tabs.tabBar().update()
 
+    # ---------- PDF / settings ----------
     def save_as_pdf(self):
         browser = self.current_browser()
         if not browser:
@@ -932,7 +1020,10 @@ class FrannyBrowser(QMainWindow):
         self.homepage = homepage
         self.zoom_level = zoom
         self.theme = theme
-        self.current_browser().setZoomFactor(zoom)
+        try:
+            self.current_browser().setZoomFactor(zoom)
+        except Exception:
+            pass
         apply_theme(QApplication.instance(), theme)
         self.adblock_enabled = adblock_enabled
         if adblock_enabled:
@@ -944,32 +1035,245 @@ class FrannyBrowser(QMainWindow):
             for i in range(self.tabs.count()):
                 browser = self.tabs.widget(i)
                 browser.page().profile().setRequestInterceptor(None)
+        # Save sync-enabled preference and start/stop auto-sync
+        self.sync_enabled = getattr(self, "sync_enabled_cb", None) and self.sync_enabled_cb.isChecked()
+        if self.sync_enabled:
+            # start periodic sync (10 minutes default)
+            self.start_auto_sync(interval_minutes=10)
+        else:
+            self.stop_auto_sync()
+        self.save_sync_settings()
+
         self.status_bar.showMessage("Settings applied.")
         dialog.accept()
 
-    def test_sync(self, homepage):
-        """Test sync using local encrypted store. Writes a sample key and reads it back."""
+    # ---------- SYNC helpers (new & improved) ----------
+    def save_sync_settings(self):
+        try:
+            cfg = {
+                "sync_enabled": getattr(self, "sync_enabled", False),
+                "last_sync": getattr(self, "last_sync", None)
+            }
+            os.makedirs(os.path.dirname(SYNC_CONFIG_PATH) or ".", exist_ok=True)
+            with tempfile.NamedTemporaryFile("w", delete=False, dir=os.path.dirname(SYNC_CONFIG_PATH) or ".") as tf:
+                json.dump(cfg, tf)
+                tf.flush()
+                tmpname = tf.name
+            shutil.move(tmpname, SYNC_CONFIG_PATH)
+        except Exception:
+            pass
+
+    def load_sync_settings(self):
+        try:
+            path = SYNC_CONFIG_PATH
+            if os.path.exists(path):
+                with open(path, "r") as f:
+                    cfg = json.load(f)
+                self.sync_enabled = cfg.get("sync_enabled", False)
+                self.last_sync = cfg.get("last_sync")
+            else:
+                self.sync_enabled = False
+                self.last_sync = None
+        except Exception:
+            self.sync_enabled = False
+            self.last_sync = None
+
+    def _store_sync_passphrase(self, passphrase):
+        if not passphrase:
+            return False
+        if _HAS_KEYRING:
+            try:
+                user = os.getenv("USER") or os.getenv("USERNAME") or "franny_user"
+                keyring.set_password("franny_sync", user, passphrase)
+                return True
+            except Exception:
+                return False
+        return False
+
+    def _get_stored_passphrase(self):
+        if _HAS_KEYRING:
+            try:
+                user = os.getenv("USER") or os.getenv("USERNAME") or "franny_user"
+                return keyring.get_password("franny_sync", user)
+            except Exception:
+                return None
+        return None
+
+    @staticmethod
+    def _atomic_write_json(path, data):
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        with tempfile.NamedTemporaryFile("w", delete=False, dir=os.path.dirname(path) or ".") as tf:
+            json.dump(data, tf, indent=2)
+            tf.flush()
+            tmpname = tf.name
+        shutil.move(tmpname, path)
+
+    def perform_sync(self, passphrase=None, direction="test"):
+        """
+        direction: "test" (roundtrip), "push" (local->remote), "pull" (remote->local), "sync" (merge both)
+        Returns (ok: bool, message: str)
+        This method runs in a worker thread (via SyncWorker).
+        """
+        try:
+            # If passphrase not provided, try to load it from keyring or UI field
+            if not passphrase:
+                passphrase = self._get_stored_passphrase() if _HAS_KEYRING else None
+            if not passphrase and getattr(self, "sync_pass_input", None):
+                passphrase = self.sync_pass_input.text()
+            if not passphrase:
+                return (False, "No sync passphrase provided.")
+
+            # Create SyncStore (wrap in try/except)
+            try:
+                from crypto.sync import SyncStore
+            except Exception as e:
+                return (False, f"Sync backend unavailable: {e}")
+
+            store_path = os.path.join(os.path.expanduser("~"), ".franny_sync_store")
+            try:
+                store = SyncStore(store_path, passphrase)
+            except Exception as e:
+                return (False, f"Failed to open SyncStore: {e}")
+
+            # Load local data to sync
+            local_bookmarks = self.load_bookmarks()
+            local_history = self.history[:] if hasattr(self, "history") else []
+
+            now_ts = datetime.datetime.utcnow().isoformat() + "Z"
+
+            # Basic test: write/read a test key
+            if direction == "test":
+                try:
+                    store.set("franny_sync_test", {"ts": now_ts})
+                    val = store.get("franny_sync_test")
+                    if val and val.get("ts"):
+                        # update last_sync in main thread via settings write (safe)
+                        self.last_sync = now_ts
+                        self.save_sync_settings()
+                        return (True, "Sync test OK (local encrypted store).")
+                    return (False, "Sync test failed: read-back mismatch.")
+                except Exception as e:
+                    return (False, f"Sync test failed: {e}")
+
+            # Push local state
+            if direction in ("push", "sync"):
+                try:
+                    # store bookmarks with timestamp
+                    store.set("bookmarks", {"ts": now_ts, "data": local_bookmarks})
+                    store.set("history", {"ts": now_ts, "data": local_history[-500:]})
+                except Exception as e:
+                    return (False, f"Failed to push data: {e}")
+
+            # Pull remote state
+            if direction in ("pull", "sync"):
+                try:
+                    remote_bookmarks = store.get("bookmarks") or {}
+                    remote_history = store.get("history") or {}
+                except Exception as e:
+                    return (False, f"Failed to pull data: {e}")
+
+                # Merge bookmarks: union by URL
+                rb_data = remote_bookmarks.get("data", []) if isinstance(remote_bookmarks, dict) else []
+                merged_bookmarks = list(dict.fromkeys((local_bookmarks or []) + (rb_data or [])))
+
+                # Apply merged bookmarks atomically to disk and to memory
+                try:
+                    self._atomic_write_json(BOOKMARKS_PATH, merged_bookmarks)
+                    # ensure in-memory state updated on main thread; write to disk succeeded
+                    self.save_bookmarks(merged_bookmarks)
+                except Exception as e:
+                    return (False, f"Failed to write merged bookmarks: {e}")
+
+                # Merge history: keep unique most recent up to N entries
+                rh_data = remote_history.get("data", []) if isinstance(remote_history, dict) else []
+                merged_history = []
+                seen = set()
+                # iterate from newest to oldest by reversing (assuming most recent appended at end)
+                for item in reversed((local_history or []) + (rh_data or [])):
+                    if item not in seen:
+                        merged_history.append(item)
+                        seen.add(item)
+                merged_history = list(reversed(merged_history))[-1000:]
+                try:
+                    with tempfile.NamedTemporaryFile("w", delete=False, dir=os.path.dirname(HISTORY_PATH) or ".") as tf:
+                        json.dump(merged_history, tf)
+                        tf.flush()
+                        tmpname = tf.name
+                    shutil.move(tmpname, HISTORY_PATH)
+                    self.history = merged_history
+                except Exception as e:
+                    return (False, f"Failed to write merged history: {e}")
+
+            # success
+            self.last_sync = now_ts
+            try:
+                self.save_sync_settings()
+            except Exception:
+                pass
+
+            return (True, "Sync completed.")
+        except Exception as e:
+            return (False, f"Unexpected sync error: {e}")
+
+    def test_sync(self, homepage=None):
+        # Kick off a background sync test and update the UI when done.
         if not getattr(self, 'sync_enabled_cb', None) or not self.sync_enabled_cb.isChecked():
             self.status_bar.showMessage("Sync is disabled.")
             return
-        passphrase = self.sync_pass_input.text() if getattr(self, 'sync_pass_input', None) else None
+
+        passphrase = None
+        if getattr(self, "sync_pass_input", None):
+            passphrase = self.sync_pass_input.text() or None
+        if not passphrase and _HAS_KEYRING:
+            passphrase = self._get_stored_passphrase()
+
         if not passphrase:
             self.status_bar.showMessage("Set a sync passphrase first.")
             return
-        try:
-            from crypto.sync import SyncStore
-            store_path = os.path.join(os.path.expanduser('~'), '.franny_sync_store')
-            store = SyncStore(store_path, passphrase)
-            store.set('test_key', {'homepage': homepage})
-            data = store.get('test_key')
-            if data and data.get('homepage') == homepage:
-                self.status_bar.showMessage('Sync test OK (local encrypted store).')
-            else:
-                self.status_bar.showMessage('Sync test failed.')
-        except Exception as e:
-            self.status_bar.showMessage(f"Sync error: {e}")
 
-    # --- Toolbar Customization Example ---
+        # Optionally store passphrase securely if keyring available
+        if _HAS_KEYRING:
+            try:
+                self._store_sync_passphrase(passphrase)
+            except Exception:
+                pass
+
+        # Use QThreadPool to run perform_sync in background
+        pool = QThreadPool.globalInstance()
+        worker = SyncWorker(self.perform_sync, passphrase, "test")
+        worker.signals.finished.connect(lambda ok, msg: self.status_bar.showMessage(msg))
+        pool.start(worker)
+
+    def start_auto_sync(self, interval_minutes=10):
+        # Create a QTimer on the main thread to trigger periodic sync
+        if hasattr(self, "_auto_sync_timer") and self._auto_sync_timer:
+            self._auto_sync_timer.stop()
+        self._auto_sync_timer = QTimer(self)
+        self._auto_sync_timer.setInterval(max(1, interval_minutes) * 60 * 1000)
+        self._auto_sync_timer.timeout.connect(lambda: self._trigger_background_sync_if_enabled())
+        self._auto_sync_timer.start()
+
+    def stop_auto_sync(self):
+        if hasattr(self, "_auto_sync_timer") and self._auto_sync_timer:
+            self._auto_sync_timer.stop()
+            self._auto_sync_timer = None
+
+    def _trigger_background_sync_if_enabled(self):
+        if not getattr(self, "sync_enabled", False):
+            return
+        passphrase = getattr(self, "sync_pass_input", None) and self.sync_pass_input.text() or None
+        if not passphrase and _HAS_KEYRING:
+            passphrase = self._get_stored_passphrase()
+        if not passphrase:
+            # cannot run without passphrase
+            self.status_bar.showMessage("Auto-sync skipped: no passphrase.")
+            return
+        pool = QThreadPool.globalInstance()
+        worker = SyncWorker(self.perform_sync, passphrase, "sync")
+        worker.signals.finished.connect(lambda ok, msg: self.status_bar.showMessage(msg))
+        pool.start(worker)
+
+    # ---------- remaining methods (toolbar customization, permissions, resource viewer, search) ----------
     def show_toolbar_customization(self):
         dialog = QDialog(self)
         dialog.setWindowTitle("Customize Toolbar")
@@ -984,9 +1288,10 @@ class FrannyBrowser(QMainWindow):
         dialog.setLayout(layout)
         dialog.exec_()
 
-    # --- Per-site Permissions Example ---
     def show_site_permissions(self):
         browser = self.current_browser()
+        if not browser:
+            return
         page = browser.page()
         dialog = QDialog(self)
         dialog.setWindowTitle("Site Permissions")
@@ -1016,6 +1321,8 @@ class FrannyBrowser(QMainWindow):
 
     def show_resource_viewer(self):
         browser = self.current_browser()
+        if not browser:
+            return
         dialog = QDialog(self)
         dialog.setWindowTitle("Site Resource Viewer")
         layout = QVBoxLayout()
@@ -1046,7 +1353,6 @@ class FrannyBrowser(QMainWindow):
         if ok and search_text:
             results = []
             for i in range(self.tabs.count()):
-                tab = self.tabs.widget(i)
                 if search_text.lower() in self.tabs.tabText(i).lower():
                     results.append(i)
             if results:
@@ -1066,65 +1372,60 @@ class FrannyAdBlocker(QWebEngineUrlRequestInterceptor):
     def interceptRequest(self, info):
         url = info.requestUrl().toString()
         if any(bad in url for bad in self.blocklist):
-            info.block(True)
+            try:
+                info.block(True)
+            except Exception:
+                pass
 
-# --- Customization: Theme Selection ---
+# -------------------- THEMES --------------------
 THEMES = {
-    "Dark": {
-        "window": QColor(53, 53, 53),
-        "text": Qt.white,
-        "base": QColor(35, 35, 35),
-        "highlight": QColor(42, 130, 218)
-    },
-    "Light": {
-        "window": Qt.white,
-        "text": Qt.black,
-        "base": QColor(245, 245, 245),
-        "highlight": QColor(42, 130, 218)
-    },
-    "Solarized": {
-        "window": QColor(0xFDF6E3),
-        "text": QColor(0x657B83),
-        "base": QColor(0xEEE8D5),
-        "highlight": QColor(0x268BD2)
-    },
-    "High Contrast": {
-        "window": Qt.black,
-        "text": Qt.yellow,
-        "base": Qt.black,
-        "highlight": Qt.red
-    }
+    "Dark": {"window_bg": "#222","toolbar_bg": "#222","toolbar_fg": "#eee","tab_bg": "#4b4b4b",
+             "tab_fg": "#ddd","tab_selected_bg": "#1a8cff","tab_selected_fg": "#fff",
+             "bookmark_bg": "#222","bookmark_fg": "#ccc","status_bg": "#222","status_fg": "#eee"},
+    "Light": {"window_bg": "#f5f5f5","toolbar_bg": "#eee","toolbar_fg": "#222","tab_bg": "#ddd",
+              "tab_fg": "#222","tab_selected_bg": "#1a8cff","tab_selected_fg": "#fff",
+              "bookmark_bg": "#eee","bookmark_fg": "#222","status_bg": "#eee","status_fg": "#222"},
+    "Dracula": {"window_bg": "#282a36","toolbar_bg": "#44475a","toolbar_fg": "#f8f8f2",
+                "tab_bg": "#6272a4","tab_fg": "#f8f8f2","tab_selected_bg": "#ff79c6",
+                "tab_selected_fg": "#282a36","bookmark_bg": "#44475a","bookmark_fg": "#f8f8f2",
+                "status_bg": "#282a36","status_fg": "#f8f8f2"},
+    "Solarized Dark": {"window_bg": "#002b36","toolbar_bg": "#073642","toolbar_fg": "#839496",
+                       "tab_bg": "#586e75","tab_fg": "#eee8d5","tab_selected_bg": "#268bd2",
+                       "tab_selected_fg": "#fdf6e3","bookmark_bg": "#073642","bookmark_fg": "#839496",
+                       "status_bg": "#002b36","status_fg": "#839496"},
+    "Solarized Light": {"window_bg": "#fdf6e3","toolbar_bg": "#eee8d5","toolbar_fg": "#657b83",
+                        "tab_bg": "#93a1a1","tab_fg": "#073642","tab_selected_bg": "#268bd2",
+                        "tab_selected_fg": "#fdf6e3","bookmark_bg": "#eee8d5","bookmark_fg": "#657b83",
+                        "status_bg": "#fdf6e3","status_fg": "#657b83"},
+    "Oceanic Blue": {"window_bg": "#1B2B34","toolbar_bg": "#343D46","toolbar_fg": "#CDD3DE",
+                     "tab_bg": "#4F5B66","tab_fg": "#CDD3DE","tab_selected_bg": "#6699CC",
+                     "tab_selected_fg": "#FFF","bookmark_bg": "#343D46","bookmark_fg": "#CDD3DE",
+                     "status_bg": "#1B2B34","status_fg": "#CDD3DE"},
+    "High Contrast": {"window_bg": "#000","toolbar_bg": "#000","toolbar_fg": "#fff",
+                      "tab_bg": "#333","tab_fg": "#fff","tab_selected_bg": "#ff0",
+                      "tab_selected_fg": "#000","bookmark_bg": "#000","bookmark_fg": "#fff",
+                      "status_bg": "#000","status_fg": "#fff"},
 }
 
-def apply_theme(app, theme_name):
+# -------------------- UTILITY FUNCTIONS --------------------
+def apply_theme(app: QApplication, theme_name: str):
     theme = THEMES.get(theme_name, THEMES["Dark"])
     palette = QPalette()
-    palette.setColor(QPalette.Window, theme["window"])
-    palette.setColor(QPalette.WindowText, theme["text"])
-    palette.setColor(QPalette.Base, theme["base"])
-    palette.setColor(QPalette.Text, theme["text"])
-    palette.setColor(QPalette.Highlight, theme["highlight"])
-    palette.setColor(QPalette.HighlightedText, theme["text"])
+    palette.setColor(QPalette.Window, QColor(theme["window_bg"]))
+    palette.setColor(QPalette.Base, QColor(theme["window_bg"]))
+    palette.setColor(QPalette.WindowText, QColor(theme["toolbar_fg"]))
+    palette.setColor(QPalette.Text, QColor(theme["toolbar_fg"]))
+    palette.setColor(QPalette.Button, QColor(theme["toolbar_bg"]))
+    palette.setColor(QPalette.ButtonText, QColor(theme["toolbar_fg"]))
+    palette.setColor(QPalette.Highlight, QColor(theme["tab_selected_bg"]))
+    palette.setColor(QPalette.HighlightedText, QColor(theme["tab_selected_fg"]))
     app.setPalette(palette)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
-    dark_palette = QPalette()
-    dark_palette.setColor(QPalette.Window, QColor(53, 53, 53))
-    dark_palette.setColor(QPalette.WindowText, Qt.white)
-    dark_palette.setColor(QPalette.Base, QColor(35, 35, 35))
-    dark_palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
-    dark_palette.setColor(QPalette.ToolTipBase, Qt.white)
-    dark_palette.setColor(QPalette.ToolTipText, Qt.white)
-    dark_palette.setColor(QPalette.Text, Qt.white)
-    dark_palette.setColor(QPalette.Button, QColor(53, 53, 53))
-    dark_palette.setColor(QPalette.ButtonText, Qt.white)
-    dark_palette.setColor(QPalette.BrightText, Qt.red)
-    dark_palette.setColor(QPalette.Link, QColor(42, 130, 218))
-    dark_palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
-    dark_palette.setColor(QPalette.HighlightedText, Qt.black)
-    app.setPalette(dark_palette)
+    # Apply default theme from the THEMES dict
+    apply_theme(app, "Dark")
     window = FrannyBrowser()
     window.show()
     sys.exit(app.exec_())
