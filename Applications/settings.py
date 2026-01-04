@@ -127,8 +127,8 @@ class SettingsApp:
         ttk.Button(parent, text="Check for Updates", command=self.check_updates).pack(anchor="w", padx=20, pady=5)
 
     def set_default_wallpaper(self):
-        set_background_image(self.root, "assets/backgrounds/wallpaper.png")
-        self.config["wallpaper"] = "assets/backgrounds/wallpaper.png"
+        set_background_image(self.root, "assets/backgrounds/wallpaper.jpg")
+        self.config["wallpaper"] = "assets/backgrounds/wallpaper.jpg"
         save_config(self.config)
 
     def set_blue_wallpaper(self):
