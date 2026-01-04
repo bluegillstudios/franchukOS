@@ -461,6 +461,12 @@ class Birdseye(QMainWindow):
         saveas_action.triggered.connect(self.save_as)
         file_menu.addAction(saveas_action)
 
+        # Run Current File action (F5)
+        run_action = QAction("Run Current File", self)
+        run_action.setShortcut("F5")
+        run_action.triggered.connect(self.run_current_file)
+        file_menu.addAction(run_action)
+
         split_action = QAction("Toggle File Tree", self)
         split_action.triggered.connect(self.toggle_file_tree)
         view_menu.addAction(split_action)
